@@ -1,0 +1,1853 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NPC 脑内图鉴</title>
+<meta name="description" content="游戏 AI 基础算法图鉴：有限状态机、行为树、贪心与麻将何切、效用 AI、寻路（BFS / Dijkstra / 贪心 / A*）、博弈树搜索（Minimax / α-β / MCTS）、群聚与 AI 导演。每一关都有能动手玩的演示。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cg stroke=%27%231d1b24%27 stroke-width=%272%27%3E%3Ccircle cx=%2716%27 cy=%277%27 r=%276%27 fill=%27%232553d6%27/%3E%3Ccircle cx=%2725%27 cy=%2716%27 r=%276%27 fill=%27%23d7263d%27/%3E%3Ccircle cx=%277%27 cy=%2716%27 r=%276%27 fill=%27%2313915a%27/%3E%3Ccircle cx=%2716%27 cy=%2725%27 r=%276%27 fill=%27%23e8a300%27/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preload" href="assets/fonts/zcool-qingke-huangyou.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/pixelify-sans.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+/* 版式：一本「攻略本」。每一关 = 关卡横幅 → 图鉴卡 + 讲解 → 名场面 → 实机演示 → 招式解析 → 过关小结。
+   四个世界借用超任手柄的四色按键：红 = 决策架构，黄 = 评估打分，蓝 = 搜索，绿 = 群体与全局。
+   字体都打包在 assets/fonts（只保留用到的字），断网、换电脑都能正常显示。
+   日间是印刷手册（墨线 + 硬投影），夜间是 RPG 对话窗（亮边框 + 黑投影）。 */
+:root {
+  --bg: #e8e6ee; --surface: #f8f7fb; --surface-2: #dedbe7; --ink: #1d1b24; --ink-2: #4a4655; --muted: #6c6779;
+  --line: #c4c0cf; --border: #1d1b24; --shadow: #1d1b24;
+  --w1: #d7263d; --w2: #e8a300; --w3: #2553d6; --w4: #13915a;
+  --on-w1: #ffffff; --on-w2: #1d1b24; --on-w3: #ffffff; --on-w4: #ffffff;
+  --good: #13915a; --bad: #d7263d;
+  --kw: #b0123f; --str: #13804b; --num: #2553d6;
+  --t-steel: #6f8396; --t-grass: #3f9e45; --t-dark: #6a4a3c; --t-normal: #b3ad8a; --t-ground: #d2a648; --t-psychic: #e0457b;
+  --t-fighting: #b8322a; --t-ghost: #6a5797; --t-flying: #9aa9f5; --t-fairy: #e79ad6; --t-fire: #e8642c; --t-water: #3d7be0; --t-electric: #f2cc30;
+  --font-display: "ZCOOL QingKe HuangYou", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-pixel: "Pixelify Sans", "PingFang SC", "Microsoft YaHei", ui-monospace, monospace;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Microsoft YaHei", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15141a; --surface: #211f29; --surface-2: #2c2935; --ink: #f0eef6; --ink-2: #c4bfd0; --muted: #9a94a8;
+    --line: #3b3746; --border: #d6d1e2; --shadow: #000000;
+    --w1: #ff5466; --w2: #ffc53d; --w3: #719aff; --w4: #3fd283;
+    --on-w1: #15141a; --on-w2: #15141a; --on-w3: #15141a; --on-w4: #15141a;
+    --good: #3fd283; --bad: #ff5466;
+    --kw: #ff7aa2; --str: #6fe0a6; --num: #8fb0ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15141a; --surface: #211f29; --surface-2: #2c2935; --ink: #f0eef6; --ink-2: #c4bfd0; --muted: #9a94a8;
+  --line: #3b3746; --border: #d6d1e2; --shadow: #000000;
+  --w1: #ff5466; --w2: #ffc53d; --w3: #719aff; --w4: #3fd283;
+  --on-w1: #15141a; --on-w2: #15141a; --on-w3: #15141a; --on-w4: #15141a;
+  --good: #3fd283; --bad: #ff5466;
+  --kw: #ff7aa2; --str: #6fe0a6; --num: #8fb0ff;
+  color-scheme: dark;
+}
+body { background-color: var(--bg); color: var(--ink); }
+</style>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="btn sm" href="#main" style="position:absolute;left:-999px;top:8px" onfocus="this.style.left='8px'" onblur="this.style.left='-999px'">跳到正文</a>
+<header class="hud" id="hud">
+  <div class="wrap hud-in">
+    <a class="logo" href="#title"><span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>NPC 脑内图鉴</span></a>
+    <nav class="stages" id="stages" aria-label="关卡选择">
+      <a href="#title">START</a>
+      <a href="#intro">0-0 开场</a>
+      <span class="sep" aria-hidden="true"></span>
+      <a href="#fsm" class="w1">1-1 状态机</a>
+      <a href="#bt" class="w1">1-2 行为树</a>
+      <span class="sep" aria-hidden="true"></span>
+      <a href="#greedy" class="w2">2-1 贪心</a>
+      <a href="#mahjong" class="w2">2-2 麻将</a>
+      <a href="#utility" class="w2">2-3 效用</a>
+      <span class="sep" aria-hidden="true"></span>
+      <a href="#astar" class="w3">3-1 寻路</a>
+      <a href="#minimax" class="w3">3-2 博弈树</a>
+      <span class="sep" aria-hidden="true"></span>
+      <a href="#boids" class="w4">4-1 群聚</a>
+      <a href="#director" class="w4">4-2 导演</a>
+      <span class="sep" aria-hidden="true"></span>
+      <a href="#ending">END 结算</a>
+    </nav>
+    <div class="hud-tools">
+      <button class="btn sm" id="theme-btn" type="button" title="切换日间 / 夜间">◐ 自动</button>
+      <button class="btn sm" id="fs-btn" type="button" title="全屏演示"><span class="k">▣</span><span class="lbl">全屏</span></button>
+    </div>
+  </div>
+  <div class="exp" id="exp" aria-hidden="true"><i id="exp-bar"></i><b>EXP</b></div>
+</header>
+
+<main id="main">
+
+<!-- ============ 标题画面 ============ -->
+<section class="hero" id="title" aria-label="标题画面">
+  <div class="wrap">
+    <div>
+      <p class="hero-eyebrow"><span class="chip">算法课 · 结课汇报</span><span>PRESS START</span></p>
+      <h1><span class="npc">NPC</span><span class="cn">脑内图鉴</span></h1>
+      <p class="hero-sub">游戏 AI 基础算法图鉴。从吃豆人的四只鬼、雀魂的何切，到怪物猎人的蛮颚龙，打开它们的脑子，看看里面到底装着什么。</p>
+      <div class="say"><span class="who">村口老爷爷</span><p>年轻人，你被 NPC 虐过吗？虐过就对了。今天带你去看看，它们到底是怎么想的。</p></div>
+      <div class="hero-cta">
+        <a class="btn pri" href="#intro">▶ 开始游戏</a>
+        <a class="btn" href="#map">选择关卡</a>
+      </div>
+      <div class="hero-meta">
+        <!-- ✏️ 汇报前把「你的名字」改成汇报人姓名 -->
+        <span>1P 汇报人 <b class="edit">你的名字</b></span>
+        <span>可玩演示 <b>12</b> 个</span>
+        <span>出场游戏 <b>30+</b> 款</span>
+        <span><span class="kbd">←</span> <span class="kbd">→</span> 切换关卡</span>
+      </div>
+    </div>
+    <figure class="screen w4" style="margin:0">
+      <div class="screen-bar"><span>实机画面：一只史莱姆的脑子</span><span class="px">FSM · 4 STATES</span></div>
+      <canvas id="hero-cv" class="touch-none" aria-label="史莱姆演示：鼠标靠近它会追过来，点击会把它吓跑"></canvas>
+      <div class="screen-foot">
+        <div class="pills" id="hero-states"><span class="pill on" data-st="IDLE">发呆</span><span class="pill" data-st="NOTICE">发现你</span><span class="pill" data-st="CHASE">追你</span><span class="pill" data-st="SCARED">受惊</span></div>
+        <span>把鼠标移过去，再点一下吓吓它</span>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ 0-0 开场 ============ -->
+<section class="stage" id="intro" aria-labelledby="intro-h">
+  <div class="wrap">
+    <p class="hero-eyebrow"><span class="chip">STAGE 0-0</span><span>开场 · 教学关</span></p>
+    <h2 class="bn-title" id="intro-h">游戏 AI 的 KPI 不是赢你</h2>
+    <p class="lead" style="max-width:46em;margin-top:16px">学术界的 AI 想赢，游戏里的 AI 想让你玩得爽。它要有破绽，会犯错，懂得演戏，还得在每帧十几毫秒的预算里想完，这点时间还要分给画面和物理。</p>
+
+    <div class="vs" role="group" aria-label="学术 AI 与游戏 AI 对比">
+      <div>
+        <h3><span class="p p1">1P</span>学术 AI</h3>
+        <dl>
+          <dt>代表</dt><dd>AlphaGo、深蓝</dd>
+          <dt>目标</dt><dd>胜率最大化</dd>
+          <dt>算力</dt><dd>机房起步</dd>
+          <dt>输了</dt><dd>写论文分析原因</dd>
+          <dt>口头禅</dt><dd>「我只是在计算。」</dd>
+        </dl>
+      </div>
+      <div class="mid" aria-hidden="true">VS</div>
+      <div>
+        <h3><span class="p p2">2P</span>游戏 AI</h3>
+        <dl>
+          <dt>代表</dt><dd>你遇到过的每一个杂兵</dd>
+          <dt>目标</dt><dd>让玩家玩得爽</dd>
+          <dt>算力</dt><dd>每帧几毫秒，几百个 NPC 分着用</dd>
+          <dt>输了</dt><dd>这本来就是它的工作</dd>
+          <dt>口头禅</dt><dd>「我会输，但要输得像个高手。」</dd>
+        </dl>
+      </div>
+    </div>
+    <p style="max-width:46em;margin-top:26px">所以游戏 AI 的评价标准很特别：<mark>让玩家觉得它聪明</mark>，比它真的聪明更重要。下面这些名场面，有的是它演砸了，有的是它演得太好了。</p>
+
+    <h3 class="sub">人工智障名人堂 <small>Hall of Fame</small></h3>
+    <div class="cases hall">
+      <article class="case">
+        <div class="case-h"><span class="genre">开放世界 RPG</span><span class="yr">2011</span></div>
+        <h4>上古卷轴 5：天际</h4>
+        <p>给店主头上扣一个水桶，就能当着他的面把货架搬空。他全程毫无察觉。</p>
+        <div class="why"><span class="diag">病因</span>NPC 的视线从头部发出，水桶挡住了这条射线。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">生活模拟</span><span class="yr">2000</span></div>
+        <h4>模拟人生</h4>
+        <p>小人下了泳池，把梯子拆掉，他们就再也上不来了。这是全球玩家最熟练的恶作剧之一。</p>
+        <div class="why"><span class="diag">病因</span>寻路图里没有离开泳池的路。<a class="go" href="#astar">→ 3-1</a></div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">即时战略</span><span class="yr">1998</span></div>
+        <h4>星际争霸</h4>
+        <p>龙骑兵在狭窄路口原地转圈、互相卡位，被玩家亲切地称为「智障龙骑」。</p>
+        <div class="why"><span class="diag">病因</span>大体型单位的寻路和碰撞没协调好。<a class="go" href="#astar">→ 3-1</a></div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">潜行游戏</span><span class="yr">通用</span></div>
+        <h4>守卫：一定是风吧</h4>
+        <p>刚才还在全图搜你，十几秒后自言自语一句「一定是风吧」，转身回去巡逻。</p>
+        <div class="why"><span class="diag">病因</span>状态机里一条按时间触发的退回转移。<a class="go" href="#fsm">→ 1-1</a></div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">魂系 ARPG</span><span class="yr">2022</span></div>
+        <h4>艾尔登法环</h4>
+        <p>你一按喝药，Boss 立刻冲脸。玩家称之为「读指令」。这一条属于演得太好了。</p>
+        <div class="why"><span class="diag">病因</span>AI 对你的动作零延迟反应。<a class="go" href="#fsm">→ 1-1</a></div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">怪物对战 RPG</span><span class="yr">2004</span></div>
+        <h4>宝可梦 绿宝石</h4>
+        <p>对手换上来的宝可梦，有时偏偏最怕你。反编译代码的注释怀疑：挑替补时比较符号写反了。</p>
+        <div class="why"><span class="diag">病因</span>贪心算法的评分函数出了问题。<a class="go" href="#greedy">→ 2-1</a></div>
+      </article>
+    </div>
+
+    <h3 class="sub">先说清楚：NPC 的脑子是什么 <small>Framework</small></h3>
+    <p class="sub-lead">抛开名词，游戏 AI 就是一个函数：每隔一帧或几帧，读入它感知到的局面，输出一个动作。最朴素的写法是一串 if：<b>if 情况 do 策略</b>。这个站里的大多数算法，回答的都是同一个问题：这串 if 怎么写得更好。</p>
+    <div class="formula">动作 = π(状态)<small>π 表示策略（policy）。状态：看见玩家没有、血量多少、手里有什么牌。动作：追击、打出北风、往左走一格。</small></div>
+    <div class="pipe">
+      <div><b>感知<small>SENSE</small></b>读入状态：看见玩家没有、血量多少、听到声音没有。游戏里通常直接读引擎里的数据，所以 Boss 能「读指令」。</div>
+      <div><b>决策<small>THINK</small></b>决定做什么。<em>决策架构</em>（状态机、行为树）管「这堆 if 怎么组织」；<em>决策算法</em>（打分、搜索）管「哪个选项最好」。本站的重点。</div>
+      <div><b>执行<small>ACT</small></b>把决定落地：寻路、瞄准、播动画。决策说「去追他」，执行负责「怎么绕过箱子」。</div>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>决策算法 = 评估 × 搜索</th><th>做法</th><th>对应关卡</th></tr></thead>
+      <tbody>
+        <tr><td class="k">评估：这个选项有多好</td><td>规则打分（人写公式），或者学出来的打分（强化学习）</td><td>2-1 贪心 · 2-2 麻将何切 · 2-3 效用 AI</td></tr>
+        <tr><td class="k">搜索：往前看几步</td><td>推演到目的地；推演到对手也出招；随机模拟很多局</td><td>3-1 寻路 · 3-2 博弈树</td></tr>
+        <tr><td class="k">两者混着用</td><td>搜到一定深度就停，用评估函数给叶子打分；MCTS 的模拟也可以只走几步再估分</td><td>3-2 的深度受限搜索、MCTS</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 class="sub" id="map">关卡地图 <small>Stage Select</small></h3>
+    <p class="sub-lead">九个关卡按「回答哪个问题」分成四个世界。四个世界不是一个比一个高级：真实的游戏几乎都在混搭，比如行为树决定做什么，打分挑目标，A* 负责走路。</p>
+    <div class="map">
+      <div class="map-axis" aria-hidden="true"><span>隐藏关</span><span>if 怎么组织</span><span>选项怎么打分</span><span>往前推演几步</span><span>一大群 / 整局怎么管</span></div>
+      <div class="map-worlds">
+        <div class="mw">
+          <h4><small>WORLD 0</small>向左走</h4>
+          <p>《植物大战僵尸》的僵尸：没有算法，只有信仰。</p>
+          <span class="lvl hidden-lvl"><span class="glyph">←</span>一直向左</span>
+        </div>
+        <div class="mw w1">
+          <h4><small>WORLD 1 · 红</small>决策架构</h4>
+          <p>把一堆 if 组织成结构，挂在 NPC 身上。</p>
+          <a class="lvl" href="#fsm"><span class="glyph">1-1</span>有限状态机</a>
+          <a class="lvl" href="#bt"><span class="glyph">1-2</span>行为树</a>
+        </div>
+        <div class="mw w2">
+          <h4><small>WORLD 2 · 黄</small>评估打分</h4>
+          <p>给每个选项打分，挑当下最好的。</p>
+          <a class="lvl" href="#greedy"><span class="glyph">2-1</span>贪心</a>
+          <a class="lvl" href="#mahjong"><span class="glyph">2-2</span>麻将何切</a>
+          <a class="lvl" href="#utility"><span class="glyph">2-3</span>效用 AI</a>
+        </div>
+        <div class="mw w3">
+          <h4><small>WORLD 3 · 蓝</small>搜索</h4>
+          <p>在脑子里推演未来，再决定现在。</p>
+          <a class="lvl" href="#astar"><span class="glyph">3-1</span>寻路</a>
+          <a class="lvl" href="#minimax"><span class="glyph">3-2</span>博弈树</a>
+        </div>
+        <div class="mw w4">
+          <h4><small>WORLD 4 · 绿</small>群体与全局</h4>
+          <p>一大群 AI，或者一个管着整局游戏的 AI。</p>
+          <a class="lvl" href="#boids"><span class="glyph">4-1</span>群聚</a>
+          <a class="lvl" href="#director"><span class="glyph">4-2</span>AI 导演</a>
+        </div>
+      </div>
+    </div>
+    <p style="max-width:46em;margin-top:22px">剧透一下最终 Boss 的弱点：让玩家觉得最「聪明」的 AI，往往不是算得最远的那个。</p>
+  </div>
+</section>
+
+<!-- ============ 1-1 有限状态机 ============ -->
+<section class="stage w1" id="fsm" aria-labelledby="fsm-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">1-1</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">World 1 · 决策架构</span><span class="type t-steel">钢</span></p>
+        <h2 class="bn-title" id="fsm-h">有限状态机<span class="en">Finite State Machine · FSM</span></h2>
+        <div class="say"><span class="who">守卫 A</span><p>刚才那边是不是有人？</p><p>……（15 秒后）一定是风吧。</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="split">
+      <aside class="dex" aria-label="图鉴：有限状态机">
+        <div class="dex-top"><span>No.001</span><span>BESTIARY</span></div>
+        <div class="dex-id">
+          <div class="portrait"><span class="spr" data-s="guard"></span></div>
+          <div><div class="dex-name">有限状态机</div><div class="dex-en">Finite State Machine</div><div class="types"><span class="type t-steel">钢</span></div></div>
+        </div>
+        <dl><dt>分类</dt><dd>决策架构系</dd><dt>出没地点</dt><dd>吃豆人、合金装备、我的世界、艾尔登法环，以及几乎所有游戏</dd></dl>
+        <div class="stats">
+          <div class="stat"><span>智商</span><span class="bar" style="--v:3"></span><b>3</b></div>
+          <div class="stat"><span>可控性</span><span class="bar" style="--v:9"></span><b>9</b></div>
+          <div class="stat"><span>上手难度</span><span class="bar" style="--v:2"></span><b>2</b></div>
+          <div class="stat"><span>CPU 开销</span><span class="bar" style="--v:1"></span><b>1</b></div>
+        </div>
+        <p class="flavor">脑子里只有几个格子，每个格子写着一种行为。听到特定的事件，就跳到另一个格子。性格耿直，非常好预测。</p>
+        <p class="weak"><b>弱点</b>状态一多，连线就会变成一盘意大利面。</p>
+      </aside>
+      <div class="prose">
+        <h3>你学过的自动机，换身皮肤就是 NPC 的大脑</h3>
+        <p class="lead">《计算理论》里的有限自动机，是游戏 AI 里出场率最高的结构。形式化地说，它是一个四元组 <b>M = (S, Σ, δ, s₀)</b>：</p>
+        <div class="defs">
+          <div><b><span class="glyph">S</span>状态集合</b>巡逻、追击、攻击……每个状态绑定一段行为代码。</div>
+          <div><b><span class="glyph">Σ</span>事件集合</b>看见玩家、血量低于 30%、计时器到点。</div>
+          <div><b><span class="glyph">δ</span>转移函数</b>δ: S × Σ → S，也就是 δ(当前状态, 事件) = 下一个状态。</div>
+          <div><b><span class="glyph">s₀</span>初始状态</b>上班第一件事：巡逻。</div>
+        </div>
+        <p>任何时刻，NPC 只处于一个状态。每一帧它只做两件事：执行当前状态的行为，检查当前状态的出边有没有被触发。所以每帧的开销只和当前状态的出边有关，和状态总数无关。写成代码就是一个 <code>switch</code>：</p>
+        <pre class="code" aria-label="状态机代码示例"><span class="k">switch</span> (state) {
+  <span class="k">case</span> PATROL:
+    followWaypoints();
+    <span class="k">if</span> (heardNoise())        state = SUSPICIOUS;
+    <span class="k">break</span>;
+  <span class="k">case</span> SUSPICIOUS:
+    walkTo(noisePos);
+    <span class="k">if</span> (seePlayer())         state = CHASE;
+    <span class="k">else if</span> (timer &gt; <span class="n">5</span>)     state = PATROL;  <span class="c">// 一定是风吧</span>
+    <span class="k">break</span>;
+  <span class="k">case</span> CHASE:
+    runTo(player);
+    <span class="k">if</span> (!seePlayer())        state = SEARCH;
+    <span class="k">break</span>;
+  <span class="k">case</span> SEARCH:
+    lookAround(lastSeenPos);
+    <span class="k">if</span> (seePlayer())         state = CHASE;
+    <span class="k">else if</span> (timer &gt; <span class="n">10</span>)    state = PATROL;
+    <span class="k">break</span>;
+}</pre>
+        <div class="note"><span class="tag">算法课笔记</span>实际项目里，状态机通常还会给每个状态配上 <code>onEnter</code> / <code>onExit</code> 回调，比如进入追击时播放一声「站住！」，离开时重置计时器。</div>
+      </div>
+    </div>
+
+    <h3 class="sub">名场面 <small>Case Files</small></h3>
+    <div class="cases">
+      <article class="case">
+        <div class="case-h"><span class="genre">街机</span><span class="yr">1980</span></div>
+        <h4>吃豆人</h4>
+        <p>四只鬼共用一个三态状态机：追击、分散、受惊。第一关的节奏写死在计时器里：分散 7 秒 → 追击 20 秒 → 分散 7 秒 → 追击 20 秒 → 分散 5 秒 → 追击 20 秒 → 分散 5 秒 → 之后一直追。吃下大力丸，全员切到受惊，掉头乱跑。</p>
+        <div class="why"><b>算法拆解：</b>计时器驱动的状态转移。分散阶段是官方安排给你的喘气时间。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">潜行</span><span class="yr">系列</span></div>
+        <h4>合金装备</h4>
+        <p>守卫发现你时头顶冒出「!」，全场进入警戒；跟丢之后转入搜索，后来的作品里还会再降一级为戒备。每一级都有倒计时，走完才回到正常巡逻。</p>
+        <div class="why"><b>算法拆解：</b>一条按倒计时逐级回退的状态链。撑过倒计时，世界就当什么都没发生过。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">沙盒</span><span class="yr">2011</span></div>
+        <h4>我的世界</h4>
+        <p>苦力怕的状态机小到能写在便利贴上：闲逛 → 发现玩家 → 追踪 → 靠近到 3 格内开始「嘶」→ 1.5 秒后爆炸。倒计时期间你跑出 7 格，或者躲开它的视线，它就熄火接着追。</p>
+        <div class="why"><b>算法拆解：</b>一个带「取消」边的倒计时状态。</div>
+      </article>
+    </div>
+
+    <div class="feature">
+      <div>
+        <div class="tagline"><span class="genre">魂系 ARPG</span><span class="yr">2022</span><span class="type t-steel">名场面特写</span></div>
+        <h4>艾尔登法环的「读指令」</h4>
+        <p>你一按喝药，Boss 立刻冲脸；你一抬手放法术，Boss 立刻侧闪。玩家管这叫读指令。</p>
+        <p>拆开看：你按键的那一帧，角色就进入了「使用道具」或「攻击」状态。这个状态对游戏引擎来说是公开信息，Boss 的 AI 当然读得到。据玩家拆包分析，FromSoftware 的敌人 AI 用一种基于 Lua 的脚本语言（Havok Script）编写，由「目标（Goal）」和「中断（Interrupt）」组成。玩家出招、使用道具这类事件会触发中断，Boss 随即切换到另一套行动。</p>
+        <p>用状态机的话说，这就是一条由事件触发的转移。它不会读心，只是反应时间为零。设计师真正要调的，是给它加多少「假装反应慢」的延迟。</p>
+        <p style="margin:0">这也是个老传统了。街机厅里被《拳皇》Boss 虐过的人都懂，格斗游戏的 CPU 读指令已经读了三十年。</p>
+      </div>
+      <div>
+        <p class="code-cap" style="margin-top:0">事件驱动的转移（示意）</p>
+        <pre class="code"><span class="c">// 玩家的状态变化会广播成事件</span>
+on 玩家状态变化(evt):
+  <span class="k">if</span> evt == <span class="s">"使用道具"</span>
+     <span class="k">and</span> 距离(玩家) &lt; <span class="n">6</span>m
+     <span class="k">and</span> 冷却完毕(<span class="s">"突进斩"</span>):
+       state = PUNISH_DASH  <span class="c">// 喝药？给你一刀</span></pre>
+        <p class="code-cap">谁先动手：反应时间对比</p>
+        <div class="react" aria-label="反应时间对比：人类约 200 毫秒，AI 一帧约 16.7 毫秒">
+          <div class="react-row"><span>人类看到再按键</span><span class="react-track"><i style="width:100%"></i></span><b>≈ 200 ms</b></div>
+          <div class="react-row"><span>AI（60 帧，1 帧）</span><span class="react-track"><i style="width:8.35%"></i></span><b>≈ 16.7 ms</b></div>
+        </div>
+        <p style="font-size:14px;color:var(--ink-2);margin-top:10px">人类的视觉反应时间一般在 200 毫秒上下。等你反应过来，AI 已经想了十几帧。</p>
+      </div>
+    </div>
+
+    <h3 class="sub">实机演示 <small>Try it</small></h3>
+    <p class="sub-lead">一个四状态的守卫，外加一个「抓获」结局。它负责决定做什么，走路交给 A* 寻路（3-1 会讲）。看看你能不能从它背后溜过去。</p>
+    <div class="console" id="fsm-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 潜入！守卫的状态机</span><span class="px" id="fsm-clock">T+000.0s</span></div>
+      <div class="con-tools">
+        <button class="btn sm pri" id="fsm-cough" type="button">咳嗽一声</button>
+        <button class="btn sm" id="fsm-reset" type="button">重置</button>
+        <span class="gap"></span>
+        <label class="sw"><input type="checkbox" id="fsm-debug" checked><span>调试视图</span></label>
+      </div>
+      <div class="con-body">
+        <div class="con-main"><canvas id="fsm-cv" class="touch-none" aria-label="潜入演示：移动鼠标控制绿色角色，点击扔石子制造噪音"></canvas></div>
+        <div class="con-side">
+          <div>
+            <div class="side-h">守卫的状态机</div>
+            <svg class="fsm-svg" id="fsm-svg" viewBox="0 0 300 250" role="img" aria-label="守卫状态图：巡逻、怀疑、追击、搜索、抓获">
+              <defs>
+                <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+                <marker id="ah-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+              </defs>
+              <path id="e-PATROL-SUSP" class="ed" d="M102 30 H196" marker-end="url(#ah)"/>
+              <text class="el" x="150" y="22" text-anchor="middle">听到声音 / 瞥见</text>
+              <path id="e-SUSP-PATROL" class="ed" d="M198 44 H104" marker-end="url(#ah)"/>
+              <text class="el" x="150" y="61" text-anchor="middle">查无此人</text>
+              <path id="e-SUSP-CHASE" class="ed" d="M240 53 V121" marker-end="url(#ah)"/>
+              <text class="el" x="247" y="91">看清了</text>
+              <path id="e-CHASE-SEARCH" class="ed" d="M198 134 H104" marker-end="url(#ah)"/>
+              <text class="el" x="150" y="127" text-anchor="middle">跟丢了</text>
+              <path id="e-SEARCH-CHASE" class="ed" d="M102 148 H196" marker-end="url(#ah)"/>
+              <text class="el" x="150" y="165" text-anchor="middle">又看见了</text>
+              <path id="e-SEARCH-PATROL" class="ed" d="M60 123 V55" marker-end="url(#ah)"/>
+              <text class="el" x="54" y="92" text-anchor="end">超时</text>
+              <path id="e-CHASE-CAUGHT" class="ed" d="M240 157 V203" marker-end="url(#ah)"/>
+              <text class="el" x="247" y="184">贴脸</text>
+              <path id="e-CAUGHT-PATROL" class="ed" d="M198 222 H8 V36 H16" marker-end="url(#ah)"/>
+              <text class="el" x="104" y="215" text-anchor="middle">重置</text>
+              <g class="st on" id="s-PATROL"><rect x="18" y="19" width="84" height="34"/><text x="60" y="36">巡逻</text></g>
+              <g class="st" id="s-SUSP"><rect x="198" y="19" width="84" height="34"/><text x="240" y="36">怀疑 ?</text></g>
+              <g class="st" id="s-CHASE"><rect x="198" y="123" width="84" height="34"/><text x="240" y="140">追击 !</text></g>
+              <g class="st" id="s-SEARCH"><rect x="18" y="123" width="84" height="34"/><text x="60" y="140">搜索</text></g>
+              <g class="st" id="s-CAUGHT"><rect x="198" y="205" width="84" height="34"/><text x="240" y="222">抓获</text></g>
+            </svg>
+          </div>
+          <div>
+            <div class="side-h">转移日志</div>
+            <ol class="log" id="fsm-log" aria-live="polite"><li><time>000.0</time>巡逻：开始上班</li></ol>
+          </div>
+        </div>
+      </div>
+      <div class="con-foot"><span><span class="kbd">按住拖动</span> 移动绿色的你</span><span><span class="kbd">单击</span> 往那里扔石子</span><span>选中画布后也能用 <span class="kbd">WASD</span> 走路、<span class="kbd">空格</span> 咳嗽</span><span>视野会被箱子挡住，头顶的条是警觉值</span></div>
+    </div>
+
+    <h3 class="sub">弱点：状态爆炸 <small>Weakness</small></h3>
+    <div class="split" style="margin-top:0">
+      <div class="prose">
+        <p>状态之间的转移边最多有 <code>N × (N − 1)</code> 条。4 个状态最多 12 条，8 个状态最多 56 条。策划每说一句「再加一个受伤状态」，你就得检查它和每个已有状态之间要不要连线。</p>
+        <p>常见的解法有三种。</p>
+        <p><b>① 分层状态机（HFSM）</b>：来自 Harel 在 1987 年提出的状态图（Statecharts）。把「巡逻、怀疑」打包成父状态「非战斗」，「追击、搜索」打包成「战斗」。写在父状态上的一条边，对里面所有子状态都生效，比如「挨打 → 战斗」只写一次。转移边从 N² 级降到每一层各自的 n² 级。</p>
+        <p><b>② 下推自动机（栈式状态机）</b>：被打断的状态先压栈，处理完再弹回来。受击硬直结束后，NPC 自动回到之前在做的事，不用给每个状态都连一条「受击 → 回去」。</p>
+        <p><b>③ 换一种结构</b>：也就是下一关的行为树。</p>
+        <pre class="code" aria-label="分层状态机示意"><span class="k">state</span> 非战斗 {              <span class="c">// 父状态，里面套一个子状态机</span>
+  巡逻 ⇄ 怀疑
+}
+<span class="k">state</span> 战斗 {
+  追击 ⇄ 搜索
+}
+非战斗 --挨打 / 看清了--&gt; 战斗    <span class="c">// 一条边，对两个子状态都生效</span>
+战斗   --跟丢 <span class="n">30</span> 秒--&gt; 非战斗</pre>
+      </div>
+      <div class="spaghetti">
+        <figure><svg viewBox="0 0 200 200" role="img" aria-label="4 个状态两两相连的状态图"><line x1="100" y1="30" x2="170" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="30" x2="100" y2="170" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="30" x2="30" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="170" y1="100" x2="100" y2="170" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="170" y1="100" x2="30" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="170" x2="30" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><rect x="83" y="20" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="100" y="30.5" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">巡逻</text><rect x="153" y="90" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="170" y="100.5" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">怀疑</text><rect x="83" y="160" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="100" y="170.5" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">追击</text><rect x="13" y="90" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="30" y="100.5" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">搜索</text></svg><figcaption><b>4</b> 个状态 · 最多 <b>12</b> 条转移</figcaption></figure>
+        <figure><svg viewBox="0 0 200 200" role="img" aria-label="8 个状态两两相连的状态图"><line x1="100" y1="30" x2="149.5" y2="50.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="30" x2="170" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="30" x2="149.5" y2="149.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="30" x2="100" y2="170" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="30" x2="50.5" y2="149.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="30" x2="30" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="30" x2="50.5" y2="50.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="50.5" x2="170" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="50.5" x2="149.5" y2="149.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="50.5" x2="100" y2="170" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="50.5" x2="50.5" y2="149.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="50.5" x2="30" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="50.5" x2="50.5" y2="50.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="170" y1="100" x2="149.5" y2="149.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="170" y1="100" x2="100" y2="170" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="170" y1="100" x2="50.5" y2="149.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="170" y1="100" x2="30" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="170" y1="100" x2="50.5" y2="50.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="149.5" x2="100" y2="170" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="149.5" x2="50.5" y2="149.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="149.5" x2="30" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="149.5" y1="149.5" x2="50.5" y2="50.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="170" x2="50.5" y2="149.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="170" x2="30" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="100" y1="170" x2="50.5" y2="50.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="50.5" y1="149.5" x2="30" y2="100" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="50.5" y1="149.5" x2="50.5" y2="50.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><line x1="30" y1="100" x2="50.5" y2="50.5" style="stroke:var(--ink-2);stroke-width:1.3;opacity:.6"/><rect x="83" y="20" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="100" y="30.5" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">巡逻</text><rect x="132.5" y="40.5" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="149.5" y="51" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">怀疑</text><rect x="153" y="90" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="170" y="100.5" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">追击</text><rect x="132.5" y="139.5" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="149.5" y="150" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">搜索</text><rect x="83" y="160" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="100" y="170.5" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">受伤</text><rect x="33.5" y="139.5" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="50.5" y="150" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">逃跑</text><rect x="13" y="90" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="30" y="100.5" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">装弹</text><rect x="33.5" y="40.5" width="34" height="20" style="fill:var(--surface);stroke:var(--border);stroke-width:2"/><text x="50.5" y="51" style="fill:var(--ink);font:700 11px var(--font-body);text-anchor:middle;dominant-baseline:central">求援</text></svg><figcaption><b>8</b> 个状态 · 最多 <b>56</b> 条转移</figcaption></figure>
+      </div>
+    </div>
+
+    <div class="pc">
+      <div class="buff"><h4>BUFF <span>优点</span></h4><ul>
+        <li>好写好懂，策划看图就能明白</li>
+        <li>好调试：打印当前状态，就知道它在想什么</li>
+        <li>CPU 开销几乎为零，一帧跑几千个也不怕</li>
+      </ul></div>
+      <div class="debuff"><h4>DEBUFF <span>缺点</span></h4><ul>
+        <li>状态一多，转移边爆炸</li>
+        <li>行为难以复用，相似的逻辑要在多个状态里各写一遍</li>
+        <li>太好预测。不过对潜行游戏来说，这反而是优点</li>
+      </ul></div>
+    </div>
+    <p class="clear"><strong>STAGE CLEAR</strong>状态机 = 几个格子 + 一堆箭头。简单、可靠，行为最容易预测。</p>
+  </div>
+</section>
+
+<!-- ============ 1-2 行为树 ============ -->
+<section class="stage w1" id="bt" aria-labelledby="bt-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">1-2</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">World 1 · 决策架构</span><span class="type t-grass">草</span></p>
+        <h2 class="bn-title" id="bt-h">行为树<span class="en">Behavior Tree · BT</span></h2>
+        <div class="say"><span class="who">策划</span><p>能不能让小兵在队长死了以后，尖叫着逃跑？</p><p>程序：加个分支就行，不用再连十条线了。</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="split">
+      <aside class="dex" aria-label="图鉴：行为树">
+        <div class="dex-top"><span>No.002</span><span>BESTIARY</span></div>
+        <div class="dex-id">
+          <div class="portrait"><span class="spr" data-s="goblin"></span></div>
+          <div><div class="dex-name">行为树</div><div class="dex-en">Behavior Tree</div><div class="types"><span class="type t-grass">草</span></div></div>
+        </div>
+        <dl><dt>分类</dt><dd>决策架构系</dd><dt>出没地点</dt><dd>光环 2、异形：隔离，以及用虚幻引擎做的大量游戏</dd></dl>
+        <div class="stats">
+          <div class="stat"><span>智商</span><span class="bar" style="--v:5"></span><b>5</b></div>
+          <div class="stat"><span>可控性</span><span class="bar" style="--v:8"></span><b>8</b></div>
+          <div class="stat"><span>上手难度</span><span class="bar" style="--v:4"></span><b>4</b></div>
+          <div class="stat"><span>CPU 开销</span><span class="bar" style="--v:2"></span><b>2</b></div>
+        </div>
+        <p class="flavor">属性是草，因为它是一棵树。每一帧从树根往下问一遍「现在该干啥」，答案按优先级排好。2005 年《光环 2》的技术分享让它在业界流行起来，如今是 3A 游戏的标配。</p>
+        <p class="weak"><b>弱点</b>只会按顺序问问题，不擅长在多个目标之间权衡。</p>
+      </aside>
+      <div class="prose">
+        <h3>四种节点，三种返回值</h3>
+        <p class="lead">行为树的每个节点被「Tick」一下，就返回三种结果之一：<b>成功</b>、<b>失败</b>、<b>运行中</b>。最基本的节点有四类：</p>
+        <div class="defs">
+          <div><b><span class="glyph">?</span>选择节点</b>从左到右挨个尝试，一个成功就停，全失败才算失败。像极了找工作：大厂 → 中厂 → 考研 → 考公 → 回家继承家业。</div>
+          <div><b><span class="glyph">→</span>顺序节点</b>从左到右依次执行，一个失败就整体失败。像极了早八：起床 → 洗漱 → 赶上校车，哪一步失败都是迟到。</div>
+          <div><b><span class="glyph">◇</span>条件节点</b>问一个是非题：看见玩家了吗？血量低于 30% 吗？</div>
+          <div><b><span class="glyph">▶</span>动作节点</b>真正干活：开火、换弹、逃跑。动作要好几帧才做完时，返回「运行中」。</div>
+        </div>
+        <p>越靠左（在下面的演示里是越靠上）的分支优先级越高。想加一个新行为，就把它插到合适的位置，不用和其他行为逐个连线。</p>
+        <p>还有两类常用节点。<b>装饰器</b>（Decorator）只有一个子节点，负责改写它的结果或执行方式：取反、重复 N 次、冷却 5 秒内不再执行。<b>并行</b>（Parallel）同时 Tick 所有子节点，再按「全部成功」或「任一成功」汇总，比如边移动边开火。条件节点要读的数据放在共享的<b>黑板</b>（Blackboard）里：感知系统往里写，行为树从里读。</p>
+        <div class="note"><span class="tag">算法课笔记</span>Tick 一次行为树，就是做一次<b>带短路的深度优先遍历</b>。选择节点是短路的 <code>||</code>，顺序节点是短路的 <code>&amp;&amp;</code>。最坏要访问全部 N 个节点，O(N)；短路让实际访问的少得多：下面的演示有 15 个节点，一次 Tick 只访问 4 到 11 个。</div>
+        <pre class="code" aria-label="行为树 Tick 伪代码"><span class="k">function</span> tick(node):
+  <span class="k">switch</span> node.type:
+    <span class="k">case</span> SELECTOR:              <span class="c">// 短路 OR</span>
+      <span class="k">for</span> child <span class="k">in</span> node.children:
+        s = tick(child)
+        <span class="k">if</span> s != FAILURE: <span class="k">return</span> s
+      <span class="k">return</span> FAILURE
+    <span class="k">case</span> SEQUENCE:              <span class="c">// 短路 AND</span>
+      <span class="k">for</span> child <span class="k">in</span> node.children:
+        s = tick(child)
+        <span class="k">if</span> s != SUCCESS: <span class="k">return</span> s
+      <span class="k">return</span> SUCCESS
+    <span class="k">case</span> CONDITION: <span class="k">return</span> node.test() ? SUCCESS : FAILURE
+    <span class="k">case</span> ACTION:    <span class="k">return</span> node.run()   <span class="c">// 可能返回 RUNNING</span></pre>
+        <p>动作返回「运行中」时，下一次 Tick 仍然从根开始，所以更高优先级的分支随时能打断它。虚幻引擎的行为树是<b>事件驱动</b>的：不每帧从根重新遍历，而是黑板上的值变化时，由装饰器的「观察者中止（Observer Aborts）」打断正在跑的低优先级分支，省掉大部分重复遍历。</p>
+      </div>
+    </div>
+
+    <h3 class="sub">名场面特写：怪物猎人的大型怪物 <small>Monster Hunter · 2018</small></h3>
+    <div class="feature" style="margin-top:0">
+      <div>
+        <div class="tagline"><span class="genre">共斗动作</span><span class="yr">2018</span><span class="type t-grass">名场面特写</span></div>
+        <h4>一只会累、会怕、会逃跑的蛮颚龙</h4>
+        <p>在《怪物猎人：世界》里狩猎蛮颚龙，你会看到它的好几种「状态」：被闪光弹晃到，原地乱咬；体力耗尽，流着口水喘气，攻击变慢；血量很低，一瘸一拐地逃回巢穴睡觉；没发现猎人的时候，在领地里巡逻、找东西吃。</p>
+        <p>这些行为天然有先后：先处理突发状况，再考虑保命，然后才是战斗，最后是日常。把它们从左到右（演示里是从上到下）排进一个选择节点，就是下面那棵树。</p>
+        <p>想加「愤怒」？在「战斗」里插一个分支。想加「地盘争夺」？在「保命」和「战斗」之间插一个。其余节点一个都不用改。</p>
+        <p style="margin:0;font-size:14px;color:var(--ink-2)">卡普空没有公开怪物 AI 的实现。下面这棵树是按游戏里能观察到的行为，用行为树复刻的。</p>
+      </div>
+      <div>
+        <figure class="shot"><img src="media/mhw-anjanath.jpg" alt="怪物猎人：世界的游戏画面：猎人骑在蛮颚龙的头上" loading="lazy"><figcaption>怪物猎人：世界（卡普空，2018）· Steam 商店页官方截图</figcaption></figure>
+        <p class="code-cap">一次 Tick 走过的路径（发现猎人、体力耗尽）</p>
+        <pre class="code" aria-label="一次 Tick 的遍历路径">根 · 选择
+├─ 先顾眼睛 → 被闪光弹晃到？ <span class="k">失败</span>
+├─ 保命要紧 → 快不行了？ <span class="k">失败</span>
+└─ 战斗
+   ├─ 发现猎人？ <span class="s">成功</span>
+   └─ 怎么打 · 选择
+      ├─ 进攻 → 还有体力？ <span class="k">失败</span>
+      └─ 疲劳：流口水喘气 <span class="n">运行中</span></pre>
+        <p style="font-size:14px;margin:0">最后一支「巡逻领地」根本没被访问：「战斗」已经返回了运行中，根上的选择节点就停了。</p>
+      </div>
+    </div>
+
+    <h3 class="sub">实机演示 <small>Try it</small></h3>
+    <p class="sub-lead">上面那棵树，一共 15 个节点。切换右边「战场上发生了什么」，再 Tick 一次，看遍历走了哪条路、跳过了哪些分支。体力会随着进攻慢慢耗光，也可以直接点「耗光体力」。</p>
+    <div class="console" id="bt-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 蛮颚龙的行为树（复刻）</span><span class="px" id="bt-tickno">TICK 0</span></div>
+      <div class="con-tools">
+        <button class="btn sm pri" id="bt-tick" type="button">▶ Tick 一次</button>
+        <button class="btn sm" id="bt-auto" type="button" aria-pressed="false">自动 Tick</button>
+        <span class="gap"></span>
+        <span class="tickinfo" id="bt-info">本次访问 <b>0</b> / 15 个节点</span>
+      </div>
+      <div class="con-body">
+        <div class="con-main bt-panel"><div class="bt-tree" id="bt-tree"></div></div>
+        <div class="con-side">
+          <div class="bt-actor">
+            <div class="bubble" id="bt-bubble">在领地里巡逻</div>
+            <div class="portrait photo"><img src="media/mhw-anjanath.jpg" alt="蛮颚龙"></div>
+            <div class="bt-act" id="bt-act">巡逻领地</div>
+          </div>
+          <div>
+            <div class="side-h">战场上发生了什么（点击切换）</div>
+            <div class="world">
+              <label class="sw"><input type="checkbox" id="bt-flash"><span>被闪光弹晃到</span></label>
+              <label class="sw"><input type="checkbox" id="bt-weak"><span>快不行了</span></label>
+              <label class="sw"><input type="checkbox" id="bt-see" checked><span>发现猎人</span></label>
+              <div class="ammo" id="bt-stamina" aria-label="体力">体力</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="con-foot"><span>绿 = 成功 · 红 = 失败 · 黄 = 运行中 · 半透明 = 这次 Tick 没被访问到（被短路了）</span><span>喘气两次 Tick 后体力回满；被晃到两次 Tick 后恢复视力</span></div>
+    </div>
+
+    <h3 class="sub">名场面 <small>Case Files</small></h3>
+    <div class="cases">
+      <article class="case">
+        <div class="case-h"><span class="genre">第一人称射击</span><span class="yr">2004</span></div>
+        <h4>光环 2</h4>
+        <p>Bungie 的 Damian Isla 在 GDC 2005 上分享了《光环 2》的 AI 架构，行为树从此在业界流行。最经典的表现：你干掉精英，旁边的咕噜人就会扔下阵地，尖叫着四散逃跑。</p>
+        <div class="why"><b>算法拆解：</b>在「战斗」分支前面插一个高优先级的「队长阵亡 → 逃跑」分支。上面蛮颚龙的「快不行了 → 逃回巢穴」是同一个套路。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">生存恐怖</span><span class="yr">2014</span></div>
+        <h4>异形：隔离</h4>
+        <p>游戏有两层 AI。上层的导演知道你在哪，用一个「威胁值」决定异形离你多近；下层是异形自己的行为树，有 100 多个节点，其中很多一开始是锁着的，随着游戏推进逐个解锁。于是玩家会觉得：它学会翻柜子找我了！</p>
+        <div class="why"><b>算法拆解：</b>它没有学习，只是解锁了行为树的新分支。上层导演见 <a class="go" href="#director">4-2</a>。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">游戏引擎</span><span class="yr">UE4 起</span></div>
+        <h4>虚幻引擎</h4>
+        <p>虚幻引擎内置了可视化的行为树编辑器，配一块叫「黑板」的共享内存。策划拖拖节点就能搭出一个敌人，大量 3A 和独立游戏的敌人都长在这套工具里。</p>
+        <div class="why"><b>算法拆解：</b>黑板 = 行为树读写的全局变量表，条件节点从这里读数据。</div>
+      </article>
+    </div>
+
+    <h3 class="sub">状态机 vs 行为树 <small>Versus</small></h3>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>有限状态机</th><th>行为树</th></tr></thead>
+      <tbody>
+        <tr><td class="k">关注点</td><td>我在哪个状态，下一步跳去哪</td><td>按优先级，现在该做什么</td></tr>
+        <tr><td class="k">加一个新行为</td><td>和已有状态逐个考虑连线</td><td>在合适位置插一个分支</td></tr>
+        <tr><td class="k">复用</td><td>难，逻辑散落在各个状态里</td><td>子树可以整棵复用</td></tr>
+        <tr><td class="k">执行方式</td><td>每帧只跑当前状态</td><td>每帧从根节点重新遍历</td></tr>
+        <tr><td class="k">典型用途</td><td>简单敌人、动画状态、UI 流程</td><td>3A 敌人、队友 AI</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="pc">
+      <div class="buff"><h4>BUFF <span>优点</span></h4><ul>
+        <li>模块化，子树可以复用</li>
+        <li>优先级一目了然：越靠左越优先</li>
+        <li>可视化编辑，策划能自己拖节点</li>
+      </ul></div>
+      <div class="debuff"><h4>DEBUFF <span>缺点</span></h4><ul>
+        <li>树一大照样难读</li>
+        <li>每次都从根节点重新评估，有一定开销</li>
+        <li>只会按固定顺序问问题，不会权衡「哪个更想做」，这是 2-3 效用 AI 的强项</li>
+      </ul></div>
+    </div>
+    <p class="clear"><strong>STAGE CLEAR</strong>行为树 = 一棵按优先级排好的问答树。Tick 一次就是一次短路的深度优先遍历。</p>
+  </div>
+</section>
+
+<!-- ============ 2-1 贪心 ============ -->
+<section class="stage w2" id="greedy" aria-labelledby="greedy-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">2-1</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">World 2 · 评估打分</span><span class="type t-dark">恶</span></p>
+        <h2 class="bn-title" id="greedy-h">贪心<span class="en">Greedy</span></h2>
+        <div class="say"><span class="who">贪心算法</span><p>现在最好的，就是最好的。以后的事，以后再说。</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="split">
+      <aside class="dex" aria-label="图鉴：贪心">
+        <div class="dex-top"><span>No.003</span><span>BESTIARY</span></div>
+        <div class="dex-id">
+          <div class="portrait"><span class="spr" data-s="ghost" data-pal="red"></span></div>
+          <div><div class="dex-name">贪心</div><div class="dex-en">Greedy</div><div class="types"><span class="type t-dark">恶</span></div></div>
+        </div>
+        <dl><dt>分类</dt><dd>打分系</dd><dt>出没地点</dt><dd>吃豆人、宝可梦、雀魂、气球塔防、吸血鬼幸存者</dd></dl>
+        <div class="stats">
+          <div class="stat"><span>智商</span><span class="bar" style="--v:3"></span><b>3</b></div>
+          <div class="stat"><span>可控性</span><span class="bar" style="--v:7"></span><b>7</b></div>
+          <div class="stat"><span>上手难度</span><span class="bar" style="--v:1"></span><b>1</b></div>
+          <div class="stat"><span>CPU 开销</span><span class="bar" style="--v:1"></span><b>1</b></div>
+        </div>
+        <p class="flavor">活在当下的算法。每一步都挑眼前看起来最好的选项，不回头，不规划。便宜到几乎不花 CPU，偶尔会把自己贪进死胡同。属性是恶，因为它真的很贪。</p>
+        <p class="weak"><b>弱点</b>只看一步，很容易被玩家预判。</p>
+      </aside>
+      <div class="prose">
+        <h3>算法课要证明它对，游戏只要它好玩</h3>
+        <p class="lead">算法课上讲贪心，重点是证明它正确：得满足贪心选择性质和最优子结构。游戏 AI 不需要它正确，只需要它便宜、够用，偶尔犯点可爱的错。</p>
+        <p>游戏里的贪心几乎都长一个样：</p>
+        <div class="formula">choice = argmax<sub>a ∈ 可选动作</sub> score(a)<small>给 n 个候选各打一个分，取最高的，每次决策 O(n)。整个算法的灵魂都在 score 里，下面几个名场面都会证明这一点。</small></div>
+        <p>四只鬼追你、训练家换宝可梦、雀魂里挑一张牌打、几百只怪朝你涌过来，用的都是这一行。</p>
+        <div class="note"><span class="tag">算法课笔记</span>贪心要得到最优解，问题得满足两条：<b>贪心选择性质</b>（每步的局部最优能扩展成全局最优）和<b>最优子结构</b>。活动选择问题按结束时间贪心是最优的，0-1 背包按性价比贪心就不是。游戏里的问题几乎都不满足这两条，所以游戏 AI 的贪心追求的是「够用」，不是「最优」。换个角度看，贪心就是只往前看一步的搜索，<a href="#minimax">3-2</a> 会把它和搜得更深的算法放在同一个棋盘上比。</div>
+      </div>
+    </div>
+
+    <h3 class="sub">名场面特写：吃豆人的四只鬼 <small>Arcade · 1980</small></h3>
+    <p class="sub-lead">每只鬼走到路口时只做一件事：在能走的方向里（不许掉头），选一个离<b>目标格</b>直线距离最近的。四只鬼的区别，只在于目标格怎么选。它们的日文名把性格写得明明白白：追いかけ（追击者）、待ち伏せ（伏击者）、気まぐれ（善变）、お惚け（装傻）。</p>
+    <div class="console" id="ghost-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 四只鬼的目标格</span><span class="px" id="gh-mode-lbl">MODE · CHASE</span></div>
+      <div class="con-tools">
+        <div class="seg" id="gh-mode" role="group" aria-label="鬼的模式">
+          <button type="button" data-m="chase" aria-pressed="true">追击</button>
+          <button type="button" data-m="scatter" aria-pressed="false">分散</button>
+          <button type="button" data-m="fright" aria-pressed="false">受惊</button>
+        </div>
+        <button class="btn sm pri" id="gh-step" type="button">走一步</button>
+        <button class="btn sm" id="gh-auto" type="button" aria-pressed="false">自动走</button>
+        <button class="btn sm" id="gh-reset" type="button">重置</button>
+        <span class="gap"></span>
+        <label class="sw"><input type="checkbox" id="gh-bug" checked><span>复刻原版溢出 bug</span></label>
+      </div>
+      <div class="con-body">
+        <div class="con-main"><canvas id="gh-cv" class="touch-none" tabindex="0" aria-label="迷宫：点击走廊放置玩家，四只鬼按各自的目标格贪心移动"></canvas></div>
+        <div class="con-side">
+          <div>
+            <div class="side-h">你的朝向</div>
+            <div style="display:flex;gap:14px;align-items:center">
+              <div class="dpad" id="gh-dpad">
+                <button type="button" data-d="up" aria-label="朝上" aria-pressed="false">▲</button>
+                <button type="button" data-d="left" aria-label="朝左" aria-pressed="true">◀</button>
+                <span class="c" aria-hidden="true"></span>
+                <button type="button" data-d="right" aria-label="朝右" aria-pressed="false">▶</button>
+                <button type="button" data-d="down" aria-label="朝下" aria-pressed="false">▼</button>
+              </div>
+              <p style="font-size:13px;line-height:1.6;color:var(--ink-2);margin:0">点击迷宫里的走廊，把自己放过去。选中画布后也能用方向键改朝向。</p>
+            </div>
+          </div>
+          <div>
+            <div class="side-h">点一只鬼，看它怎么选方向</div>
+            <div class="ghost-legend" id="gh-legend">
+              <button class="gl" type="button" data-g="0" aria-pressed="true"><span class="spr" data-s="ghost" data-pal="red"></span><span><b>红鬼 · 直男</b>目标 = 你所在的格子</span></button>
+              <button class="gl" type="button" data-g="1" aria-pressed="false"><span class="spr" data-s="ghost" data-pal="pink"></span><span><b>粉鬼 · 心机</b>目标 = 你面前 4 格，专门堵你前面</span></button>
+              <button class="gl" type="button" data-g="2" aria-pressed="false"><span class="spr" data-s="ghost" data-pal="cyan"></span><span><b>青鬼 · 看队友脸色</b>以你面前 2 格为支点，把「红鬼 → 支点」延长一倍</span></button>
+              <button class="gl" type="button" data-g="3" aria-pressed="false"><span class="spr" data-s="ghost" data-pal="orange"></span><span><b>橙鬼 · 社恐</b>离你超过 8 格就追，进了 8 格就跑回左下角</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="con-foot"><span>虚线 = 鬼到目标格</span><span>✕ = 目标格</span><span>箭头上的数字 = 该方向下一格到目标格的直线距离，取最小</span><span>平局按 上 &gt; 左 &gt; 下 &gt; 右</span></div>
+    </div>
+    <div class="note"><span class="tag">冷知识</span>原版有个溢出 bug：你朝上时，粉鬼的目标不是你上方 4 格，而是上方 4 格再往左 4 格；青鬼的支点也跟着歪，原因是计算偏移量时的一个溢出错误。四十多年没人修，它已经成了游戏的一部分。上面的开关默认打开。</div>
+
+    <h3 class="sub">名场面特写：宝可梦的贪心换人 <small>Monster RPG · 2004</small></h3>
+    <div class="feature" style="margin-top:0">
+      <div>
+        <div class="tagline"><span class="genre">怪物对战 RPG</span><span class="yr">绿宝石</span></div>
+        <h4>训练家 AI：不是在读你，是在记仇</h4>
+        <p>在《宝可梦 绿宝石》的反编译项目 pret/pokeemerald 里，AI 选招式就是标准的打分取最大：每个能用的招式先给 100 分，再由一串规则加减分，最后选分最高的，平分就随机挑一个。</p>
+        <p>换人也是贪心。如果你上一招打中它的是火、水、电属性，而它队里有能吸收这个属性的宝可梦（特性是引火、储水、蓄电），它就有一定概率换过去。它看的是你<b>上一招</b>打了什么，所以与其说它在读你，不如说它在记仇。</p>
+        <p style="margin:0">挑替补时，它会按属性相克给每只候选打分取最高。有意思的是，社区在这段代码旁边写了一条注释。</p>
+      </div>
+      <div>
+        <p class="code-cap" style="margin-top:0">src/battle_ai_switch_items.c（节选）</p>
+        <pre class="code"><span class="c">/* Possible bug: this comparison gives the type
+   that takes the most damage, when a "good" AI
+   would want to select the type that takes the
+   least damage. */</span>
+<span class="k">if</span> (bestDmg &lt; typeDmg)
+{
+    bestDmg = typeDmg;
+    bestMonId = i;
+}</pre>
+        <p style="font-size:15px">翻译：这个比较挑出的是<b>挨打最疼</b>的那只，好的 AI 应该挑挨打最轻的。注释里还说，不确定这是失误，还是一个奇怪的设计。</p>
+        <p style="font-size:15px;margin:0">所以对手换上来的那只偏偏最怕你，可能真的不是错觉。贪心本身没错，错在评分函数。</p>
+      </div>
+    </div>
+
+    <h3 class="sub">从单打到双打：贪心一下变难了 <small>VGC · 2023</small></h3>
+    <p class="sub-lead">宝可梦的正式比赛（VGC）打双打：每边同时上场两只。对贪心来说，难在三个地方。</p>
+    <div class="defs">
+      <div><b><span class="glyph">1</span>选择变多</b>每只 4 个招式，还要选打对面哪一只；两只一组合就是几十种，这还没算换人。</div>
+      <div><b><span class="glyph">2</span>各算各的会撞车</b>两只都挑「自己伤害最高」的那招，常常打同一个对手：一只就够打倒，另一只白打。</div>
+      <div><b><span class="glyph">3</span>辅助招算不出分</b>守住、蘑菇孢子、愤怒粉都不造成伤害，按伤害打分永远轮不到它们，冠军的队伍却离不开它们。</div>
+    </div>
+    <p style="max-width:70ch">下面把 2023 年宝可梦世界锦标赛 VGC 冠军木村翔平的队伍交给贪心 AI，对手是亚军 Michael Kelsch 的队伍。</p>
+    <div class="console" id="vgc-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 把冠军的队伍交给贪心 AI</span><span class="px">ARGMAX</span></div>
+      <div class="con-tools">
+        <div class="seg" id="vgc-mode" role="group" aria-label="贪心怎么打分">
+          <button type="button" data-m="single" aria-pressed="true">单只贪心：各算各的</button>
+          <button type="button" data-m="joint" aria-pressed="false">组合贪心：两只一起算</button>
+        </div>
+        <span class="gap"></span>
+        <span class="lbl">打分 = 伤害（每只对手最多算 100%）+ 打倒奖励 50</span>
+      </div>
+      <div class="vgc-body">
+        <div>
+          <div class="side-h">对面：亚军 Michael Kelsch（点两只上场）</div>
+          <div class="pk-grid" id="vgc-foes"></div>
+          <div class="side-h">我方：冠军木村翔平（点两只上场）</div>
+          <div class="pk-grid" id="vgc-mine"></div>
+        </div>
+        <div class="vgc-main">
+          <div class="vgc-cards" id="vgc-cards"></div>
+          <div class="say" id="vgc-say"><span class="who">解说</span><p></p><p></p></div>
+        </div>
+      </div>
+      <div class="con-foot"><span>伤害按 50 级粗算，不算道具、太晶化、场地和随机数</span><span>卡片最下面是轮换防守：可能被一击打倒，就换上替补里最扛打的那只</span></div>
+    </div>
+    <p style="max-width:70ch;margin-top:22px">组合贪心把两只的招式两两配对再打分，就不会撞车了。可它仍然只看这一回合：对面会不会守住、会不会换人、谁先出手，它都不知道。再加上顺风（几回合内全队速度翻倍）、击掌奇袭（只在上场第一回合有效）、开场地、特性联动，按伤害打分的贪心根本顾不过来。这也是正作剧情里双打对手不多的原因之一：让 AI 把这些都考虑进去，设计起来难得多。</p>
+    <p style="max-width:70ch">人类高手还会<b>读换</b>：你算准它会换上地面系来免疫电击，下一回合直接甩一个水系招式过去。想不被读，就得把对手的反应也算进去，这正是 <a href="#minimax">3-2 博弈树</a>要做的事。</p>
+
+    <h3 class="sub">更多名场面 <small>Case Files</small></h3>
+    <div class="cases">
+      <article class="case">
+        <div class="case-h"><span class="genre">塔防</span><span class="yr">系列</span></div>
+        <h4>气球塔防</h4>
+        <p>每座塔都能设置攻击优先级：第一个、最后一个、最近的、最强的。每一帧它都只从射程内挑一个当前最优的目标来打。</p>
+        <div class="why"><b>算法拆解：</b>贪心目标选择。射程内扫一遍，O(n)。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">割草 Roguelite</span><span class="yr">2022</span></div>
+        <h4>吸血鬼幸存者</h4>
+        <p>满屏几百上千只怪，每只都只做一件事：朝你所在的方向挪一步。没有寻路，没有配合，靠数量淹没你。</p>
+        <div class="why"><b>算法拆解：</b>最朴素的贪心追踪，每帧让距离变小。怪一多，便宜比聪明重要。</div>
+      </article>
+    </div>
+
+    <div class="pc">
+      <div class="buff"><h4>BUFF <span>优点</span></h4><ul>
+        <li>极快，扫一遍候选就有答案</li>
+        <li>规则简单，策划容易调</li>
+        <li>行为直观，玩家能读懂敌人，也就能学会对付它</li>
+      </ul></div>
+      <div class="debuff"><h4>DEBUFF <span>缺点</span></h4><ul>
+        <li>只看眼前，会被墙挡住、被死胡同困住（3-1 有演示）</li>
+        <li>结果是确定的，容易被玩家预判</li>
+        <li>好坏全看评分函数。比较符号写反，AI 就开始送</li>
+      </ul></div>
+    </div>
+    <p class="clear"><strong>STAGE CLEAR</strong>贪心 = 打分 + 取最大。好不好用，全看评分函数。</p>
+  </div>
+</section>
+
+<!-- ============ 2-2 麻将何切 ============ -->
+<section class="stage w2" id="mahjong" aria-labelledby="mahjong-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">2-2</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">World 2 · 评估打分</span><span class="type t-water">水</span></p>
+        <h2 class="bn-title" id="mahjong-h">麻将何切：把「牌效」变成数字<span class="en">Mahjong Tile Efficiency · Shanten &amp; Ukeire</span></h2>
+        <div class="say"><span class="who">雀魂新手</span><p>摸了一张牌，十四张里到底打哪张？</p><p>贪心 AI：打北。打完 2 向听，进张 40 张，全场最多。</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="split">
+      <aside class="dex" aria-label="图鉴：麻将何切">
+        <div class="dex-top"><span>No.004</span><span>BESTIARY</span></div>
+        <div class="dex-id">
+          <div class="portrait"><span class="tile z dex-tile"><span class="n">北</span></span></div>
+          <div><div class="dex-name">麻将何切</div><div class="dex-en">Shanten · Ukeire</div><div class="types"><span class="type t-water">水</span></div></div>
+        </div>
+        <dl><dt>分类</dt><dd>打分系</dd><dt>出没地点</dt><dd>雀魂、天凤等日本麻将游戏里的每一次打牌；何切练习和牌理计算工具</dd></dl>
+        <div class="stats">
+          <div class="stat"><span>智商</span><span class="bar" style="--v:5"></span><b>5</b></div>
+          <div class="stat"><span>可控性</span><span class="bar" style="--v:8"></span><b>8</b></div>
+          <div class="stat"><span>上手难度</span><span class="bar" style="--v:5"></span><b>5</b></div>
+          <div class="stat"><span>CPU 开销</span><span class="bar" style="--v:3"></span><b>3</b></div>
+        </div>
+        <p class="flavor">麻将里最常见的问题叫「何切」：摸进一张牌后，十四张里打哪张？它只用一条贪心规则：打完离听牌最近；一样近，就选能让你往前走的牌最多的。属性是水，因为打出去的牌都进了牌河。</p>
+        <p class="weak"><b>弱点</b>只顾自己的手牌：不防守，不看役和点数，也不管别人打过什么牌。</p>
+      </aside>
+      <div class="prose">
+        <h3>先把「离和牌还有多远」量化</h3>
+        <p class="lead">贪心需要一个分数。何切的分数有两层：先比<b>向听数</b>，一样再比<b>进张数</b>。</p>
+        <div class="defs">
+          <div><b><span class="glyph">面</span>面子</b>三张一组：顺子（同花色连续三张，如 345 筒）或刻子（三张一样）。</div>
+          <div><b><span class="glyph">搭</span>搭子</b>差一张就成面子的两张：两面（67 万）、嵌张（79 条）、边张（12 条）、对子。</div>
+          <div><b><span class="glyph">听</span>向听数</b>最少还要换进几张有用的牌才能听牌。0 = 听牌（只差最后一张），−1 = 已经和了。</div>
+          <div><b><span class="glyph">进</span>进张</b>摸到以后能让向听数减 1 的牌，一共还剩几张。</div>
+        </div>
+        <p>和牌的基本形是 <b>4 个面子 + 1 个雀头</b>（一对）。这种形状的向听数可以这样算：</p>
+        <div class="formula">向听数 = 8 − 2 × 面子 − 搭子 − 雀头<small>其中 面子 + 搭子 ≤ 4（多出来的搭子不算），雀头取 0 或 1。为什么是 8：4 个面子各差 2 张、雀头差 1 张，一共 9 张；听牌时允许还差最后 1 张，所以是 8。七对子另有公式：6 − 对子数 + max(0, 7 − 牌的种类数)，两者取小。</small></div>
+        <p>难点是同一手牌有很多种拆法：3456 可以拆成 345 + 6，也可以拆成 34 + 56，拆法不同，算出来的向听数也不同。程序用深度优先搜索把所有拆法试一遍，取最小的那个。</p>
+      </div>
+    </div>
+
+    <p class="code-cap">向听数：深度优先搜索所有拆法（和本页演示用的是同一套逻辑）</p>
+    <pre class="code" aria-label="向听数计算的伪代码"><span class="k">function</span> 向听(c):                        <span class="c">// c[t] = 第 t 种牌有几张，一共 34 种</span>
+  best = <span class="n">8</span>
+  <span class="k">function</span> dfs(i, 面子, 搭子, 雀头):
+    跳过 c[i] == <span class="n">0</span> 的牌
+    <span class="k">if</span> i == <span class="n">34</span>:                           <span class="c">// 每张牌都分好了组</span>
+      best = min(best, <span class="n">8</span> - <span class="n">2</span>*面子 - min(搭子, <span class="n">4</span> - 面子) - 雀头)
+      <span class="k">return</span>
+    <span class="k">if</span> c[i] ≥ <span class="n">3</span>:            取刻子，dfs(i, 面子+<span class="n">1</span>, 搭子, 雀头)
+    <span class="k">if</span> 能组成顺子 i,i+<span class="n">1</span>,i+<span class="n">2</span>: 取顺子，dfs(i, 面子+<span class="n">1</span>, 搭子, 雀头)
+    <span class="k">if</span> 还没雀头 <span class="k">and</span> c[i] ≥ <span class="n">2</span>: 取雀头，dfs(i, 面子, 搭子, <span class="n">1</span>)
+    <span class="k">if</span> 面子 + 搭子 &lt; <span class="n">4</span>:     分别取对子 / 相邻两张 / 隔一张，dfs(i, 面子, 搭子+<span class="n">1</span>, 雀头)
+    把这张当孤张丢掉，dfs(i, 面子, 搭子, 雀头)
+                                          <span class="c">// 每次 dfs 回来都把拿走的牌放回 c（回溯）</span>
+  dfs(<span class="n">0</span>, <span class="n">0</span>, <span class="n">0</span>, <span class="n">0</span>)
+  <span class="k">return</span> min(best, 七对子向听(c))</pre>
+
+    <h3 class="sub">贪心何切 <small>Greedy Discard</small></h3>
+    <div class="formula">打哪张 = argmin<sub>d</sub> ( 向听(手牌 − d) , −进张(手牌 − d) )<small>两个数按顺序比：先让向听数最小；向听数一样，再让进张最多。每次决策最多试 14 种打法 × 34 种摸牌，也就是几百次向听计算，几毫秒就算完。</small></div>
+    <pre class="code" aria-label="贪心何切的伪代码"><span class="k">function</span> 何切(手牌):                       <span class="c">// 手牌 14 张</span>
+  <span class="k">for</span> d <span class="k">in</span> 手牌里的每一种牌:
+    s = 向听(手牌 - d)
+    进张 = <span class="n">0</span>
+    <span class="k">for</span> t <span class="k">in</span> <span class="n">34</span> 种牌:                         <span class="c">// 假设下一张摸到 t</span>
+      <span class="k">if</span> 向听(手牌 - d + t) &lt; s:
+        进张 += <span class="n">4</span> - 手牌里已有的 t 的张数
+    记下 (d, s, 进张)
+  <span class="k">return</span> 按 (s 从小到大, 进张 从多到少) 排第一的 d</pre>
+
+    <h3 class="sub">例题：这手牌打哪张？ <small>Worked Example</small></h3>
+    <div class="split" style="margin-top:0">
+      <div>
+        <div class="mj-example" aria-label="例题手牌：二三四万、六七万、三四五五筒、一二条、七九条、北">
+          <span class="tile m"><span class="n">二</span><span class="s">万</span></span><span class="tile m"><span class="n">三</span><span class="s">万</span></span><span class="tile m"><span class="n">四</span><span class="s">万</span></span><span class="tile m"><span class="n">六</span><span class="s">万</span></span><span class="tile m"><span class="n">七</span><span class="s">万</span></span><span class="tile p"><span class="n">3</span><span class="s">筒</span></span><span class="tile p"><span class="n">4</span><span class="s">筒</span></span><span class="tile p"><span class="n">5</span><span class="s">筒</span></span><span class="tile p"><span class="n">5</span><span class="s">筒</span></span><span class="tile s"><span class="n">1</span><span class="s">条</span></span><span class="tile s"><span class="n">2</span><span class="s">条</span></span><span class="tile s"><span class="n">7</span><span class="s">条</span></span><span class="tile s"><span class="n">9</span><span class="s">条</span></span><span class="tile z drawn"><span class="n">北</span></span>
+        </div>
+        <p style="margin-top:14px">打北之后：二三四万、345 筒是 <b>2 个面子</b>；六七万（两面）、12 条（边张）、79 条（嵌张）是 3 个搭子，但面子 + 搭子最多算 4，所以只算 <b>2 个</b>；剩下一张 5 筒落单。</p>
+        <div class="formula" style="margin-top:0">8 − 2 × 2 − 2 − 0 = 2 向听<small>换一种拆法，把 55 筒当雀头、34 筒当搭子，算出来也是 2。DFS 会把这些拆法都试一遍。</small></div>
+      </div>
+      <div>
+        <div class="tbl" style="margin-top:0"><table class="mj-table">
+          <thead><tr><th>打出</th><th class="num">打完向听</th><th class="num">进张</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr class="win"><td class="k">北</td><td class="num">2</td><td class="num">40</td><td>孤立的字牌，没用：贪心选它</td></tr>
+            <tr><td class="k">5 筒</td><td class="num">2</td><td class="num">37</td><td>3455 筒拆掉一张 5</td></tr>
+            <tr><td class="k">1 / 2 / 7 / 9 条</td><td class="num">2</td><td class="num">24</td><td>拆掉边张或嵌张</td></tr>
+            <tr><td class="k">六 / 七万</td><td class="num">2</td><td class="num">20</td><td>拆掉两面搭子</td></tr>
+            <tr><td class="k">3 / 4 筒</td><td class="num">2</td><td class="num">16</td><td>拆坏 345 筒</td></tr>
+            <tr><td class="k">四万</td><td class="num">3</td><td class="num">56</td><td>进张最多，但向听退了一步</td></tr>
+            <tr><td class="k">二 / 三万</td><td class="num">3</td><td class="num">52</td><td>拆坏面子，向听退一步</td></tr>
+          </tbody>
+        </table></div>
+        <p style="font-size:14px;color:var(--ink-2);margin-top:12px">打四万的进张有 56 张，比打北还多。但它拆坏了面子，向听数退到 3。贪心先比向听、再比进张，所以不选它。这张表由下面演示里的程序算出，打开演示就是这道题。</p>
+      </div>
+    </div>
+
+    <h3 class="sub">实机演示 <small>Try it</small></h3>
+    <p class="sub-lead">默认就是上面的例题。点任意一张牌打出去，下面会告诉你贪心怎么看；也可以让贪心一路打到和牌。这里没有对手，只练「牌效」。</p>
+    <div class="console" id="mj-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 何切计算器</span><span class="px" id="mj-turn">TURN 0</span></div>
+      <div class="con-tools">
+        <button class="btn sm pri" id="mj-step" type="button">按贪心打一张</button>
+        <button class="btn sm" id="mj-auto" type="button" aria-pressed="false">自动打到和牌</button>
+        <span class="gap"></span>
+        <button class="btn sm" id="mj-new" type="button">换一手牌</button>
+        <button class="btn sm" id="mj-example" type="button">回到例题</button>
+      </div>
+      <div class="mj-body">
+        <div class="mj-top">
+          <div><div class="side-h">你的手牌（点一张打出去 · 最右边是刚摸的牌 · 浮起来的是贪心的推荐）</div><div class="mj-hand" id="mj-hand"></div></div>
+          <div class="mj-status" id="mj-status"></div>
+        </div>
+      </div>
+      <div class="mj-grid">
+        <div><div class="side-h">打掉每张牌之后（贪心挑第一行）</div><div class="mj-rank" id="mj-rank"></div></div>
+        <div><p class="side-h" id="mj-best"></p><div class="mj-waits" id="mj-waits"></div><p class="mj-log" id="mj-log"></p></div>
+      </div>
+      <div class="con-foot"><span>进张只扣掉了你自己手里的牌</span><span>一局大约每人摸 18 次牌，摸完还没和就算流局</span></div>
+    </div>
+
+    <h3 class="sub">贪心何切的局限 <small>Weakness</small></h3>
+    <div class="cases four">
+      <article class="case">
+        <div class="case-h"><span class="genre">不防守</span></div>
+        <h4>别人立直了，它照打危险牌</h4>
+        <p>它只看自己的手牌。别人已经听牌，它还会为了多几张进张，打出一张很可能点炮的牌。</p>
+        <div class="why"><b>补救：</b>给每张牌算一个「危险度」，打分时减掉。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">不看役和点数</span></div>
+        <h4>听牌了，却和不了</h4>
+        <p>立直麻将没有役不能荣和。它只追求最快听牌，可能听成一个没有役的形状，也可能为了快放弃大牌。</p>
+        <div class="why"><b>补救：</b>把打点的期望也写进评估函数，这就是 <a class="go" href="#utility">2-3 效用 AI</a> 的思路。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">信息没用全</span></div>
+        <h4>牌河里的牌，它当没看见</h4>
+        <p>进张只扣掉了自己手里的牌。牌河里、别人碰杠出来的牌，其实也摸不到了。</p>
+        <div class="why"><b>补救：</b>剩余张数改成扣掉场上所有看得见的牌。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">只看一步</span></div>
+        <h4>分不清以后好不好听</h4>
+        <p>进张只问「下一张能不能让向听数减 1」，不问减完之后的形状好不好。两种打法进张一样，一种将来能听两面（8 张），一种只能听嵌张（4 张），它分不出来。</p>
+        <div class="why"><b>补救：</b>往后多推演几巡，比如蒙特卡洛模拟摸牌，见 <a class="go" href="#minimax">3-2</a>。</div>
+      </article>
+    </div>
+
+    <div class="feature">
+      <div>
+        <div class="tagline"><span class="genre">日本麻将</span><span class="yr">2019</span><span class="type t-water">名场面特写</span></div>
+        <h4>Suphx：天凤十段的麻将 AI</h4>
+        <p>微软亚洲研究院的 Suphx 在天凤平台和人类对局，2019 年达到十段，是第一个做到的 AI。它的分数不是人手写的：先用人类高手的牌谱做监督学习，再通过大量自我对局做强化学习，把「这张牌打出去有多好」学出来。</p>
+        <p>它看的信息也比贪心多得多：别人的弃牌和副露、谁立直了、当前点数和名次。论文里提到，它的长处之一就是防守。</p>
+        <p style="margin:0">所以这一关的贪心是起点，不是终点：向听和进张是最基本的特征，往上加防守、打点、局势，再往上就是让机器自己学打分。</p>
+      </div>
+      <div>
+        <figure class="shot"><img src="media/mahjong-table.jpg" alt="雀魂的对局画面：四人麻将牌桌" loading="lazy"><figcaption>雀魂（Yostar，2019）· Steam 商店页官方截图</figcaption></figure>
+      </div>
+    </div>
+
+    <div class="pc">
+      <div class="buff"><h4>BUFF <span>优点</span></h4><ul>
+        <li>向听和进张都能精确计算，分数可解释</li>
+        <li>几毫秒出结果，适合做电脑对手和提示功能</li>
+        <li>新手照着它打，牌效马上提高一截</li>
+      </ul></div>
+      <div class="debuff"><h4>DEBUFF <span>缺点</span></h4><ul>
+        <li>不防守，别人立直了照样打危险牌</li>
+        <li>不看役、点数和场况</li>
+        <li>只看一步，分不清以后的听牌形状好坏</li>
+      </ul></div>
+    </div>
+    <p class="clear"><strong>STAGE CLEAR</strong>何切 = 先比向听数，再比进张数。把「牌效」变成两个能算的数字，贪心就能用了。</p>
+  </div>
+</section>
+
+<!-- ============ 2-3 效用 AI ============ -->
+<section class="stage w2" id="utility" aria-labelledby="utility-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">2-3</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">World 2 · 评估打分</span><span class="type t-normal">一般</span></p>
+        <h2 class="bn-title" id="utility-h">效用 AI<span class="en">Utility AI</span></h2>
+        <div class="say"><span class="who">模拟市民</span><p>饿了吃饭，困了睡觉，无聊了打游戏。</p><p>憋不住了的时候……其他事先放一放。</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="split">
+      <aside class="dex" aria-label="图鉴：效用 AI">
+        <div class="dex-top"><span>No.005</span><span>BESTIARY</span></div>
+        <div class="dex-id">
+          <div class="portrait"><span class="spr" data-s="sim"></span></div>
+          <div><div class="dex-name">效用 AI</div><div class="dex-en">Utility AI</div><div class="types"><span class="type t-normal">一般</span></div></div>
+        </div>
+        <dl><dt>分类</dt><dd>打分系</dd><dt>出没地点</dt><dd>模拟人生、文明系列，以及很多开放世界 NPC 的日程表</dd></dl>
+        <div class="stats">
+          <div class="stat"><span>智商</span><span class="bar" style="--v:6"></span><b>6</b></div>
+          <div class="stat"><span>可控性</span><span class="bar" style="--v:6"></span><b>6</b></div>
+          <div class="stat"><span>上手难度</span><span class="bar" style="--v:4"></span><b>4</b></div>
+          <div class="stat"><span>CPU 开销</span><span class="bar" style="--v:2"></span><b>2</b></div>
+        </div>
+        <p class="flavor">给每个可能的行动算一个「有多想做」的分数，挑最高的去做。可以看作贪心的豪华版：评分函数更讲究，会同时照顾好几种需求。属性是一般，因为它主要负责过日子。</p>
+        <p class="weak"><b>弱点</b>调参地狱。分数咬得很近时，会在两件事之间反复横跳。</p>
+      </aside>
+      <div class="prose">
+        <h3>人生就是一连串 argmax</h3>
+        <p class="lead">行为树按固定顺序问问题，效用 AI 则把所有选项一起摆上桌打分。业界常把这套做法叫「效用理论」，Dave Mark 和 Kevin Dill 在 GDC 2010 的演讲里系统地讲过。</p>
+        <div class="formula">效用(行动) = Σ 权重<sub>i</sub> × 曲线<sub>i</sub>(需求<sub>i</sub>)<small>需求越低越急。曲线决定「急」的方式，权重决定这个行动能解决哪些需求。</small></div>
+        <p>曲线是效用 AI 的灵魂。有点饿时，吃饭的欲望很低；饿过某个点之后，吃饭会突然变成头等大事。</p>
+        <div class="curves">
+          <figure><svg viewBox="0 0 160 96" aria-hidden="true"><line x1="14" y1="82" x2="152" y2="82" style="stroke:var(--line);stroke-width:1"/><line x1="14" y1="8" x2="14" y2="82" style="stroke:var(--line);stroke-width:1"/><path d="M14,82 L17.4,80.1 L20.9,78.3 L24.4,76.5 L27.8,74.6 L31.2,72.8 L34.7,70.9 L38.1,69 L41.6,67.2 L45,65.3 L48.5,63.5 L52,61.6 L55.4,59.8 L58.9,58 L62.3,56.1 L65.8,54.2 L69.2,52.4 L72.7,50.5 L76.1,48.7 L79.5,46.9 L83,45 L86.5,43.1 L89.9,41.3 L93.3,39.5 L96.8,37.6 L100.2,35.8 L103.7,33.9 L107.2,32 L110.6,30.2 L114,28.4 L117.5,26.5 L121,24.6 L124.4,22.8 L127.8,21 L131.3,19.1 L134.8,17.2 L138.2,15.4 L141.7,13.5 L145.1,11.7 L148.5,9.9 L152,8" style="fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round"/><text x="152" y="94" style="fill:var(--ink-2);font:500 9px var(--font-body);text-anchor:end">急</text><text x="14" y="94" style="fill:var(--ink-2);font:500 9px var(--font-body)">不急</text></svg><figcaption><b>线性</b>均匀地越来越想</figcaption></figure><figure><svg viewBox="0 0 160 96" aria-hidden="true"><line x1="14" y1="82" x2="152" y2="82" style="stroke:var(--line);stroke-width:1"/><line x1="14" y1="8" x2="14" y2="82" style="stroke:var(--line);stroke-width:1"/><path d="M14,82 L17.4,82 L20.9,82 L24.4,82 L27.8,81.9 L31.2,81.9 L34.7,81.8 L38.1,81.6 L41.6,81.4 L45,81.2 L48.5,80.8 L52,80.5 L55.4,80 L58.9,79.5 L62.3,78.8 L65.8,78.1 L69.2,77.3 L72.7,76.3 L76.1,75.3 L79.5,74.1 L83,72.8 L86.5,71.3 L89.9,69.7 L93.3,67.9 L96.8,66 L100.2,63.9 L103.7,61.7 L107.2,59.2 L110.6,56.6 L114,53.8 L117.5,50.8 L121,47.6 L124.4,44.1 L127.8,40.4 L131.3,36.6 L134.8,32.4 L138.2,28.1 L141.7,23.4 L145.1,18.6 L148.5,13.4 L152,8" style="fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round"/><text x="152" y="94" style="fill:var(--ink-2);font:500 9px var(--font-body);text-anchor:end">急</text><text x="14" y="94" style="fill:var(--ink-2);font:500 9px var(--font-body)">不急</text></svg><figcaption><b>指数</b>越憋越急，比如膀胱</figcaption></figure><figure><svg viewBox="0 0 160 96" aria-hidden="true"><line x1="14" y1="82" x2="152" y2="82" style="stroke:var(--line);stroke-width:1"/><line x1="14" y1="8" x2="14" y2="82" style="stroke:var(--line);stroke-width:1"/><path d="M14,82 L17.4,82 L20.9,82 L24.4,82 L27.8,81.9 L31.2,81.9 L34.7,81.9 L38.1,81.8 L41.6,81.7 L45,81.6 L48.5,81.5 L52,81.2 L55.4,80.9 L58.9,80.5 L62.3,79.8 L65.8,79 L69.2,77.8 L72.7,76.1 L76.1,73.9 L79.5,71 L83,67.4 L86.5,62.8 L89.9,57.4 L93.3,51.4 L96.8,45 L100.2,38.6 L103.7,32.6 L107.2,27.2 L110.6,22.6 L114,19 L117.5,16.1 L121,13.9 L124.4,12.2 L127.8,11 L131.3,10.2 L134.8,9.5 L138.2,9.1 L141.7,8.8 L145.1,8.5 L148.5,8.4 L152,8.3" style="fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round"/><text x="152" y="94" style="fill:var(--ink-2);font:500 9px var(--font-body);text-anchor:end">急</text><text x="14" y="94" style="fill:var(--ink-2);font:500 9px var(--font-body)">不急</text></svg><figcaption><b>S 形</b>过了阈值突然在意</figcaption></figure>
+        </div>
+        <p>只取最高分的话，两件事分数接近时会出现反复横跳：刚走到冰箱前，又觉得该去睡觉。常见的补丁有两个：给<b>正在做的事</b>加一点惯性分，或者从最高的几项里<b>按分数加权随机</b>，让小人看起来没那么像机器。</p>
+        <div class="note"><span class="tag">进阶</span>到这里为止，分数都是人写的公式。分数也可以<b>学</b>出来：强化学习让 AI 在游戏里反复试错，学一个函数 Q(s, a)，表示在局面 s 做动作 a 之后总共能拿到多少奖励；每走一步，按 <code>Q(s,a) ← Q(s,a) + α·[r + γ·max Q(s′,a′) − Q(s,a)]</code> 修正一点（α 是学习率，γ 是对未来奖励打的折扣）。学好以后，决策还是「取分数最高的那个」，只是分数是练出来的。AlphaGo、麻将 AI Suphx、GT 赛车的 GT Sophy 都属于这一类。商业游戏的 NPC 仍然很少这么做，原因见<a href="#ending">结算页</a>。</div>
+      </div>
+    </div>
+
+    <h3 class="sub">实机演示 <small>Try it</small></h3>
+    <p class="sub-lead">五种需求会随时间下降。小人每次闲下来，就给六个行动打分，挑最高的去做。拖动左边的需求条，可以直接改他的状态。</p>
+    <div class="console" id="ut-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 小人的一天</span><span class="px" id="ut-clock">DAY 1 · 08:00</span></div>
+      <div class="con-tools">
+        <div class="seg" id="ut-speed" role="group" aria-label="时间流速">
+          <button type="button" data-v="1" aria-pressed="true">1×</button>
+          <button type="button" data-v="3" aria-pressed="false">3×</button>
+          <button type="button" data-v="0" aria-pressed="false">暂停</button>
+        </div>
+        <label class="sw"><input type="checkbox" id="ut-rand"><span>在前两名里加权随机</span></label>
+        <span class="gap"></span>
+        <button class="btn sm" id="ut-reset" type="button">重置</button>
+      </div>
+      <div class="ut-grid">
+        <div><div class="side-h">需求（可拖动）</div><div id="ut-needs"></div></div>
+        <div><div class="side-h">每个行动的效用分</div><div id="ut-acts"></div><p class="tickinfo" id="ut-why" style="margin:10px 0 0"></p></div>
+        <div class="sim-actor">
+          <div class="bubble" id="ut-bubble">新的一天！</div>
+          <div class="portrait"><span class="spr" data-s="sim"></span></div>
+          <div class="doing-lbl" id="ut-doing">发呆</div>
+          <div class="progress" aria-hidden="true"><i id="ut-prog"></i></div>
+        </div>
+      </div>
+      <div class="con-foot"><span>正在做的事有 +15 的惯性分；别的行动超过它 15 分以上才会打断</span></div>
+    </div>
+
+    <h3 class="sub">名场面 <small>Case Files</small></h3>
+    <div class="cases">
+      <article class="case">
+        <div class="case-h"><span class="genre">生活模拟</span><span class="yr">2000</span></div>
+        <h4>模拟人生</h4>
+        <p>小人有饥饿、膀胱、精力、娱乐、卫生等需求。家里的每件物品都会向周围「广播」自己能满足什么：冰箱喊「我能解决饥饿」，电视喊「我能解闷」。小人给所有选项打分，从高分里挑一个去做。</p>
+        <div class="why"><b>算法拆解：</b>这套设计叫「智能物件」。逻辑写在物品上，加一件新家具，小人就自动学会用它。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">4X 策略</span><span class="yr">1991 / 2010</span></div>
+        <h4>文明：核平甘地</h4>
+        <p>每个 AI 领袖都有一组性格参数，决定它多爱打仗、多爱造奇观、多爱核武。传说初代《文明》里甘地的侵略值是 1，进入民主后减 2，无符号整数下溢成 255，和平主义者开始满地扔核弹。席德·梅尔在 2020 年的回忆录里澄清：这个 bug 并不存在。不过《文明 5》真的把甘地的核武偏好设成了 12，全场最高，把传说做成了彩蛋。</p>
+        <div class="why"><b>算法拆解：</b>效用函数里的权重就是 NPC 的性格。附赠一道算法课习题：8 位无符号整数 1 − 2 等于几？</div>
+      </article>
+    </div>
+
+    <div class="pc">
+      <div class="buff"><h4>BUFF <span>优点</span></h4><ul>
+        <li>能同时权衡多种需求，行为自然</li>
+        <li>加一个新行动，只要写一个打分函数</li>
+        <li>权重就是性格，改几个数字就是另一个 NPC</li>
+      </ul></div>
+      <div class="debuff"><h4>DEBUFF <span>缺点</span></h4><ul>
+        <li>调参地狱，打分项一多就难以预料</li>
+        <li>分数接近时会反复横跳，需要惯性或随机来压</li>
+        <li>只看当下，不会往后推演几步，那是 World 3 搜索的活</li>
+      </ul></div>
+    </div>
+    <p class="clear"><strong>STAGE CLEAR</strong>效用 AI = 给所有选项打分 + 取最大。本质是一个评分函数很讲究的贪心。</p>
+  </div>
+</section>
+
+<!-- ============ 3-1 寻路 ============ -->
+<section class="stage w3" id="astar" aria-labelledby="astar-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">3-1</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">World 3 · 搜索</span><span class="type t-ground">地面</span></p>
+        <h2 class="bn-title" id="astar-h">寻路：BFS / Dijkstra / 贪心 / A*<span class="en">Pathfinding · BFS · Dijkstra · Greedy Best-First · A*</span></h2>
+        <div class="say"><span class="who">龙骑兵</span><p>我要去那边。</p><p>……我怎么又绕回原地了？</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="split">
+      <aside class="dex" aria-label="图鉴：寻路">
+        <div class="dex-top"><span>No.006</span><span>BESTIARY</span></div>
+        <div class="dex-id">
+          <div class="portrait"><span class="spr" data-s="hero"></span></div>
+          <div><div class="dex-name">寻路</div><div class="dex-en">Graph Search · A*</div><div class="types"><span class="type t-ground">地面</span></div></div>
+        </div>
+        <dl><dt>分类</dt><dd>搜索系</dd><dt>出没地点</dt><dd>星际争霸、帝国时代、模拟人生，以及几乎所有 3D 游戏</dd></dl>
+        <div class="stats">
+          <div class="stat"><span>智商</span><span class="bar" style="--v:6"></span><b>6</b></div>
+          <div class="stat"><span>可控性</span><span class="bar" style="--v:9"></span><b>9</b></div>
+          <div class="stat"><span>上手难度</span><span class="bar" style="--v:4"></span><b>4</b></div>
+          <div class="stat"><span>CPU 开销</span><span class="bar" style="--v:5"></span><b>5</b></div>
+        </div>
+        <p class="flavor">主角 A* 是 1968 年出生的老前辈，至今仍是游戏寻路的标准答案：一边记着已经走了多远，一边估计还剩多远，两者之和最小的先走。BFS、Dijkstra、贪心最佳优先是它的三个兄弟，各自只学会了一半本事。属性是地面，因为它负责走路。</p>
+        <p class="weak"><b>弱点</b>地图大、单位多时很吃 CPU；门一关、桥一断，就得重算。</p>
+      </aside>
+      <div class="prose">
+        <h3>四个算法，同一个框架</h3>
+        <p class="lead">把地图看成一张图：格子是节点，相邻格子之间连一条边，边上写着走过去的代价。四个算法都维护一张「待探索」表（open 表），每次取出排在最前面的格子展开，再把它的邻居放进表里。区别只在<b>按什么排队</b>。</p>
+        <div class="formula">f(n) = g(n) + h(n)<small>g(n)：从起点走到 n 的真实代价。h(n)：从 n 到终点的估计代价，叫启发函数。A* 每次展开 f 最小的节点。</small></div>
+        <div class="tbl" style="box-shadow:none;margin-top:6px"><table style="min-width:560px">
+          <thead><tr><th>算法</th><th>按什么排队</th><th>保证最短？</th><th>时间复杂度</th></tr></thead>
+          <tbody>
+            <tr><td class="k">BFS 广度优先</td><td>步数（先进先出队列）</td><td>只在每步代价都一样时</td><td>O(V + E)</td></tr>
+            <tr><td class="k">Dijkstra</td><td>g</td><td>是（边的代价不能为负）</td><td>O((V + E) log V)</td></tr>
+            <tr><td class="k">贪心最佳优先</td><td>h</td><td>否，还会被 U 型墙骗进去</td><td>最坏同上，通常很快</td></tr>
+            <tr><td class="k">A*</td><td>g + h</td><td>h 可采纳时是</td><td>最坏同上，h 越准越快</td></tr>
+          </tbody>
+        </table></div>
+        <p style="font-size:15px;color:var(--ink-2)">V 是格子数，E 是边数；带 log 的是用二叉堆实现优先队列的情况。</p>
+        <p>寻路属于 NPC 的<b>执行层</b>：决策层说「去追他」，寻路负责「怎么绕过箱子」。它放在「搜索」这个世界，是因为它和下一关的博弈树一样，都是在图上搜索。</p>
+      </div>
+    </div>
+
+    <p class="code-cap">A* 伪代码（把排队规则换掉，就是另外三个算法）</p>
+    <pre class="code" aria-label="A* 伪代码"><span class="k">function</span> A_star(start, goal):
+  open = 优先队列，按 f = g + h 从小到大     <span class="c">// BFS 用普通队列，Dijkstra 按 g，贪心按 h</span>
+  g[start] = <span class="n">0</span>;  open.push(start)
+  <span class="k">while</span> open 不空:
+    n = open.pop()                         <span class="c">// 取出 f 最小的</span>
+    <span class="k">if</span> n == goal: <span class="k">return</span> 沿 parent 回溯出路径
+    <span class="k">for</span> m <span class="k">in</span> neighbors(n):
+      new_g = g[n] + cost(n, m)
+      <span class="k">if</span> m 没见过 <span class="k">or</span> new_g &lt; g[m]:        <span class="c">// 找到了更便宜的走法</span>
+        g[m] = new_g;  parent[m] = n
+        open.push(m, f = new_g + h(m))
+  <span class="k">return</span> 无路可走                          <span class="c">// 模拟人生：拆了梯子的泳池</span></pre>
+    <div class="note"><span class="tag">算法课笔记</span>h 从不高估真实代价，叫<b>可采纳</b>，这时 A* 找到的一定是最短路。h 还满足 h(n) ≤ cost(n, m) + h(m)（像三角不等式），叫<b>一致</b>，这时每个节点最多展开一次，不用回头重算。四方向移动常用曼哈顿距离 <code>|dx| + |dy|</code>，它既可采纳又一致。两个极端：h 恒为 0 时，A* 退化成 Dijkstra；h 恰好等于真实代价时，A* 只展开最短路上的格子。游戏里还常用<b>加权 A*</b>（f = g + w·h，w &gt; 1）：路径最多是最短路的 w 倍，但搜得快得多。玩家看不出差别，CPU 看得出来。</div>
+
+    <h3 class="sub">实机演示 <small>Try it</small></h3>
+    <p class="sub-lead">先选「U 型陷阱」，分别用贪心和 A* 跑一遍，看看谁被骗了。再换「沼泽地」，比较 BFS 和 Dijkstra 的路径代价。</p>
+    <div class="console" id="as-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 寻路算法对决</span><span class="px" id="as-status">READY</span></div>
+      <div class="con-tools">
+        <div class="seg" id="as-algo" role="group" aria-label="算法">
+          <button type="button" data-a="bfs" aria-pressed="false">BFS</button>
+          <button type="button" data-a="dijkstra" aria-pressed="false">Dijkstra</button>
+          <button type="button" data-a="greedy" aria-pressed="false">贪心</button>
+          <button type="button" data-a="astar" aria-pressed="true">A*</button>
+        </div>
+        <button class="btn sm pri" id="as-run" type="button">▶ 开始寻路</button>
+        <button class="btn sm" id="as-cmp" type="button">四个一起比</button>
+        <span class="gap"></span>
+        <label class="lbl" for="as-speed">速度</label><input type="range" id="as-speed" min="1" max="60" value="10" style="width:110px">
+      </div>
+      <div class="con-tools">
+        <span class="lbl">画笔</span>
+        <div class="seg" id="as-tool" role="group" aria-label="画笔">
+          <button type="button" data-t="wall" aria-pressed="true">墙</button>
+          <button type="button" data-t="swamp" aria-pressed="false">沼泽 ×5</button>
+          <button type="button" data-t="erase" aria-pressed="false">橡皮</button>
+          <button type="button" data-t="start" aria-pressed="false">起点</button>
+          <button type="button" data-t="goal" aria-pressed="false">终点</button>
+        </div>
+        <span class="gap"></span>
+        <span class="lbl">地图</span>
+        <div class="seg" id="as-map" role="group" aria-label="预设地图">
+          <button type="button" data-p="trap" aria-pressed="true">U 型陷阱</button>
+          <button type="button" data-p="swamp" aria-pressed="false">沼泽地</button>
+          <button type="button" data-p="maze" aria-pressed="false">随机迷宫</button>
+          <button type="button" data-p="clear" aria-pressed="false">清空</button>
+        </div>
+      </div>
+      <div class="con-body">
+        <div class="con-main"><canvas id="as-cv" class="touch-none" aria-label="寻路网格：拖动画墙或沼泽，选择算法后开始寻路"></canvas></div>
+        <div class="con-side">
+          <div>
+            <div class="side-h">本次结果 · <span id="as-algo-name">A*</span></div>
+            <div class="statgrid"><div><small>展开节点</small><b id="as-exp">0</b></div><div><small>路径步数</small><b id="as-len">-</b></div><div><small>路径代价</small><b id="as-cost">-</b></div></div>
+          </div>
+          <div>
+            <div class="side-h">四个一起比（同一张地图）</div>
+            <table class="cmp" id="as-cmp-t"><thead><tr><th>算法</th><th class="num">展开节点</th><th class="num">路径代价</th></tr></thead><tbody><tr><td colspan="3" style="color:var(--ink-2)">点「四个一起比」</td></tr></tbody></table>
+          </div>
+          <div class="legend">
+            <span><i class="lg-open"></i>待探索</span><span><i class="lg-closed"></i>已展开</span><span><i class="lg-path"></i>最终路径</span><span><i class="lg-swamp"></i>沼泽</span>
+          </div>
+        </div>
+      </div>
+      <div class="con-foot"><span><span class="kbd">拖动</span> 用当前画笔作画</span><span>沼泽每格代价 5，普通格代价 1</span><span>BFS 不看代价，只数步数</span></div>
+    </div>
+
+    <h3 class="sub">实测：同一张沼泽地图 <small>Benchmark</small></h3>
+    <p class="sub-lead">在上面的演示里选「沼泽地」，点「四个一起比」，就能得到这组数字。沼泽每格代价 5，普通格代价 1。</p>
+    <div class="tbl"><table style="min-width:560px">
+      <thead><tr><th>算法</th><th class="num">展开节点</th><th class="num">路径代价</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td class="k">BFS</td><td class="num">360</td><td class="num">47</td><td>只数步数，直接蹚过沼泽</td></tr>
+        <tr><td class="k">Dijkstra</td><td class="num">424</td><td class="num">37</td><td>路最短，但向四面八方都找，展开最多</td></tr>
+        <tr><td class="k">贪心最佳优先</td><td class="num">24</td><td class="num">47</td><td>展开最少，可路不是最短</td></tr>
+        <tr class="win"><td class="k">A*</td><td class="num">188</td><td class="num">37</td><td>和 Dijkstra 一样短，展开的不到它的一半</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 class="sub">名场面 <small>Case Files</small></h3>
+    <div class="cases">
+      <article class="case">
+        <div class="case-h"><span class="genre">即时战略</span><span class="yr">1998</span></div>
+        <h4>星际争霸</h4>
+        <p>龙骑兵体型大，走窄路时容易和友军互相卡住，经常在路口原地转圈。玩家口中的「智障龙骑」由此而来，打仗时得时刻盯着它们，免得在路口堵成一团。</p>
+        <div class="why"><b>算法拆解：</b>寻路只解决了「走哪条路」，几十个单位同时挤一条路，还需要局部避让。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">3D 游戏通用</span><span class="yr">现代</span></div>
+        <h4>导航网格 NavMesh</h4>
+        <p>3D 游戏一般不在格子上寻路，而是把能走的地面切成一块块凸多边形，在多边形的邻接图上跑 A*，最后把折线拉直。开源库 Recast &amp; Detour 被大量引擎采用。</p>
+        <div class="why"><b>算法拆解：</b>图变小了，A* 跑得更快；拉直路径，NPC 走起来不像在走格子。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">即时战略</span><span class="yr">2010</span></div>
+        <h4>最高指挥官 2</h4>
+        <p>几百个单位要去同一个地方时，与其每个都跑一遍 A*，不如从终点出发算一张「方向场」：每个格子都写着往哪走离终点更近，单位顺着箭头流过去就行。</p>
+        <div class="why"><b>算法拆解：</b>流场寻路。一次 Dijkstra 从终点反向扩展，所有单位共享结果。</div>
+      </article>
+    </div>
+
+    <div class="pc">
+      <div class="buff"><h4>BUFF <span>优点</span></h4><ul>
+        <li>启发式可采纳时保证最短路</li>
+        <li>启发式越准，搜得越少</li>
+        <li>不只能找路：任何「状态 + 代价」的图都能搜，比如在「世界状态」图上规划一串动作（GOAP 规划器）</li>
+      </ul></div>
+      <div class="debuff"><h4>DEBUFF <span>缺点</span></h4><ul>
+        <li>地图大、单位多时开销可观</li>
+        <li>世界一变就要重算，动态障碍很头疼</li>
+        <li>只管怎么走，不管该不该去</li>
+      </ul></div>
+    </div>
+    <p class="clear"><strong>STAGE CLEAR</strong>寻路 = 一个优先队列 + 一条排队规则。A* 按「已付代价 + 对未来的估计」排队，估计越准，搜得越少。</p>
+  </div>
+</section>
+
+<!-- ============ 3-2 博弈树 ============ -->
+<section class="stage w3" id="minimax" aria-labelledby="minimax-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">3-2</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">World 3 · 搜索</span><span class="type t-fighting">格斗</span><span class="type t-ghost">幽灵</span></p>
+        <h2 class="bn-title" id="minimax-h">博弈树：井字棋的六种下法<span class="en">Game Tree Search · Minimax · α-β · Depth-Limited · MCTS</span></h2>
+        <div class="say"><span class="who">对战高手</span><p>你以为我会换人？我预判了你的预判。</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="split">
+      <aside class="dex" aria-label="图鉴：博弈树">
+        <div class="dex-top"><span>No.007</span><span>BESTIARY</span></div>
+        <div class="dex-id">
+          <div class="portrait"><span class="spr" data-s="pawn"></span></div>
+          <div><div class="dex-name">博弈树</div><div class="dex-en">Minimax · α-β · MCTS</div><div class="types"><span class="type t-fighting">格斗</span><span class="type t-ghost">幽灵</span></div></div>
+        </div>
+        <dl><dt>分类</dt><dd>搜索系</dd><dt>出没地点</dt><dd>国际象棋、围棋、全面战争：罗马 2，以及各种棋牌游戏</dd></dl>
+        <div class="stats">
+          <div class="stat"><span>智商</span><span class="bar" style="--v:9"></span><b>9</b></div>
+          <div class="stat"><span>可控性</span><span class="bar" style="--v:5"></span><b>5</b></div>
+          <div class="stat"><span>上手难度</span><span class="bar" style="--v:5"></span><b>5</b></div>
+          <div class="stat"><span>CPU 开销</span><span class="bar" style="--v:9"></span><b>9</b></div>
+        </div>
+        <p class="flavor">专门对付会还手的对手。它假设你每一步都走最好的棋，再在这个前提下找自己的最优解。双属性：极小化极大是格斗系；蒙特卡洛树搜索靠随机模拟平行宇宙，算幽灵系。</p>
+        <p class="weak"><b>弱点</b>分支一多就爆炸；实时游戏很难提前模拟未来。</p>
+      </aside>
+      <div class="prose">
+        <h3>假设对手也很聪明</h3>
+        <p class="lead">轮到我（MAX）时，选分数最高的分支；轮到你（MIN）时，假设你会选让我分数最低的分支。从叶子开始一层层往上倒推，就得到了这一步的最优解。</p>
+        <svg class="tree-svg" viewBox="0 0 520 236" role="img" aria-label="博弈树示例：根节点 MAX 取三个 MIN 子节点 3、2、2 中的最大值 3；中间分支的后两个叶子被 α-β 剪枝">
+          <text class="lbl" x="8" y="34" style="text-anchor:start">MAX 我</text>
+          <text class="lbl" x="8" y="112" style="text-anchor:start">MIN 你</text>
+          <text class="lbl" x="8" y="196" style="text-anchor:start">局面分</text>
+          <line class="lnk" x1="260" y1="48" x2="110" y2="96" style="stroke-width:3.5"/>
+          <line class="lnk" x1="260" y1="48" x2="260" y2="96"/>
+          <line class="lnk" x1="260" y1="48" x2="410" y2="96"/>
+          <line class="lnk" x1="110" y1="128" x2="62" y2="178"/><line class="lnk" x1="110" y1="128" x2="110" y2="178"/><line class="lnk" x1="110" y1="128" x2="158" y2="178"/>
+          <line class="lnk" x1="260" y1="128" x2="212" y2="178"/>
+          <line class="lnk pruned" x1="260" y1="128" x2="260" y2="178"/><line class="lnk pruned" x1="260" y1="128" x2="308" y2="178"/>
+          <line class="cut" x1="262" y1="146" x2="300" y2="146"/>
+          <text class="lbl" x="318" y="146" style="text-anchor:start">剪掉</text>
+          <line class="lnk" x1="410" y1="128" x2="362" y2="178"/><line class="lnk" x1="410" y1="128" x2="410" y2="178"/><line class="lnk" x1="410" y1="128" x2="458" y2="178"/>
+          <polygon class="max" points="260,12 236,48 284,48"/><text class="on-max" x="260" y="36">3</text>
+          <polygon class="min" points="88,96 132,96 110,130"/><text class="on-min" x="110" y="107">3</text>
+          <polygon class="min" points="238,96 282,96 260,130"/><text class="on-min" x="260" y="107">≤2</text>
+          <polygon class="min" points="388,96 432,96 410,130"/><text class="on-min" x="410" y="107">2</text>
+          <rect class="nodebox" x="46" y="180" width="32" height="28"/><text x="62" y="194">3</text>
+          <rect class="nodebox" x="94" y="180" width="32" height="28"/><text x="110" y="194">12</text>
+          <rect class="nodebox" x="142" y="180" width="32" height="28"/><text x="158" y="194">8</text>
+          <rect class="nodebox" x="196" y="180" width="32" height="28"/><text x="212" y="194">2</text>
+          <rect class="nodebox" x="244" y="180" width="32" height="28" style="stroke-dasharray:4 3;opacity:.55"/><text class="pr-txt" x="260" y="194">4</text>
+          <rect class="nodebox" x="292" y="180" width="32" height="28" style="stroke-dasharray:4 3;opacity:.55"/><text class="pr-txt" x="308" y="194">6</text>
+          <rect class="nodebox" x="346" y="180" width="32" height="28"/><text x="362" y="194">14</text>
+          <rect class="nodebox" x="394" y="180" width="32" height="28"/><text x="410" y="194">5</text>
+          <rect class="nodebox" x="442" y="180" width="32" height="28"/><text x="458" y="194">2</text>
+          <text class="lbl" x="290" y="104" style="text-anchor:start">α = 3</text>
+          <text class="lbl" x="260" y="226">中间的 MIN 看到 2 就停：它最多给我 2，而我手里已经有 3</text>
+        </svg>
+        <div class="formula">V(s) = 胜负分，若 s 是终局<br>V(s) = max<sub>a</sub> V(result(s, a))，若轮到我（MAX）<br>V(s) = min<sub>a</sub> V(result(s, a))，若轮到对手（MIN）<small>这是两人、零和、信息完全公开的博弈。result(s, a) 是在局面 s 走 a 之后的新局面。深度优先地搜，时间 O(b<sup>d</sup>)，空间 O(b·d)：b 是每步平均有几种走法，d 是要往后看几步。</small></div>
+        <p><b>α-β 剪枝</b>：搜索时记两个数。α 是我方已经确保能拿到的最低分，β 是对手已经确保能把我压到的最高分。一旦某个分支里 α ≥ β，说明双方都不会让棋局走到这里，剩下的子节点不用看了。剪枝不改变结果。先搜到好棋，后面就剪得多：最好情况只需看 O(b<sup>d/2</sup>) 个节点（Knuth 与 Moore，1975），同样的时间能多搜一倍的深度。</p>
+        <p>感受一下规模：井字棋的完整博弈树只有 549,946 个节点，电脑一眨眼就搜完；国际象棋的博弈树复杂度约为 10<sup>120</sup>（香农数），把宇宙里的原子都拿来当草稿纸也不够。</p>
+      </div>
+    </div>
+    <p class="code-cap">带 α-β 剪枝的 Minimax</p>
+    <pre class="code"><span class="k">function</span> minimax(s, depth, α, β, isMax):
+  <span class="k">if</span> depth == <span class="n">0</span> <span class="k">or</span> s.isOver(): <span class="k">return</span> evaluate(s)
+  <span class="k">if</span> isMax:
+    v = -∞
+    <span class="k">for</span> m <span class="k">in</span> s.moves():
+      v = max(v, minimax(s.play(m), depth - <span class="n">1</span>, α, β, <span class="k">false</span>))
+      α = max(α, v)
+      <span class="k">if</span> α &gt;= β: <span class="k">break</span>     <span class="c">// 对手不会让你走到这里</span>
+    <span class="k">return</span> v
+  <span class="k">else</span>:
+    v = +∞
+    <span class="k">for</span> m <span class="k">in</span> s.moves():
+      v = min(v, minimax(s.play(m), depth - <span class="n">1</span>, α, β, <span class="k">true</span>))
+      β = min(β, v)
+      <span class="k">if</span> α &gt;= β: <span class="k">break</span>     <span class="c">// 你也不会走到这里</span>
+    <span class="k">return</span> v</pre>
+
+    <h3 class="sub">搜不到底：深度受限 + 评估函数 <small>Depth-Limited Search</small></h3>
+    <div class="prose" style="max-width:76ch">
+      <p>国际象棋搜不到终局，那就搜到第 d 层停下，用一个<b>评估函数</b> eval(s) 给这些「半路上的局面」估一个分，代替真正的胜负。深蓝就是这么做的：α-β 搜十几层，叶子交给评估函数，它把约 8000 种棋形特征加权求和（Campbell 等，2002）。</p>
+      <p>本页井字棋的「深度 2」难度，用的评估函数来自《人工智能：一种现代方法》的习题：</p>
+    </div>
+    <div class="formula">eval(s) = 3·M₂ + M₁ − (3·T₂ + T₁)<small>M<sub>n</sub>：恰好有我方 n 个子、没有对方子的线（行、列、对角线）有几条；T<sub>n</sub> 是对方的。快连成的线越多，分越高。</small></div>
+    <div class="note" style="max-width:76ch"><span class="tag">实测</span>井字棋太小了：只看 2 步，配上这个评估函数，就已经不会输。我们穷举了所有下法，不管谁先手，都没有任何一条线能赢它。评估函数越准，需要搜的深度就越浅。反过来，评估函数一差，就会出现<b>地平线效应</b>：危险藏在第 d + 1 层，AI 看不见，还以为局面很好。</div>
+
+    <h3 class="sub">算不完？那就随机模拟 <small>Monte Carlo Tree Search</small></h3>
+    <div class="prose" style="max-width:76ch">
+      <p>围棋每一步大约有 250 种走法，一盘要下 150 手左右，Minimax 根本搜不动，也很难写出靠谱的评估函数。蒙特卡洛树搜索的思路很朴素：不知道哪步好，那就每步都随便下完很多盘，看哪步赢得多。为了不把时间浪费在烂棋上，它每轮做四件事：</p>
+    </div>
+    <div class="mcts">
+      <div><b>选择</b>从根往下走，每层挑 UCT 分数最高的子节点，直到碰上还有走法没试过的节点。</div>
+      <div><b>扩展</b>在这个节点上试一种新走法，长出一个子节点。</div>
+      <div><b>模拟</b>从新节点开始随机下到终局，或者下几步就用评估函数估分。平行宇宙一日游。</div>
+      <div><b>回传</b>把这盘的胜负沿着来时的路径往上，更新每个节点的访问次数和胜场。</div>
+    </div>
+    <div class="formula">UCT = w / n + c · √( ln N / n )<small>前一项：这步历史上赢得多不多（利用）。后一项：这步试得够不够多（探索），试得越少越想再试。w 是胜场，n 是这个子节点的访问次数，N 是父节点的访问次数，c 常取 √2（Kocsis 与 Szepesvári，2006）。时间用完后，选访问次数最多的那一步。</small></div>
+    <div class="note" style="max-width:76ch"><span class="tag">注意</span>「模拟」不一定要下到终局。棋局很长时，可以随机走几步就停，再用评估函数估分。AlphaGo 把价值网络的估分和快速走子的结果混在一起用；AlphaZero 干脆不再随机走子，直接用神经网络估分。MCTS 还可以随时停：给多少时间就模拟多少局，时间越多越准。所以「打分」和「搜索」不是两条互不相干的路，大多数强 AI 都是两者混着用。</div>
+
+    <h3 class="sub">实机演示：同一盘棋，六种 AI <small>Try it</small></h3>
+    <p class="sub-lead">前两种不往后看；「深度 2」只看两步，剩下的交给评估函数；Minimax 和 α-β 搜到终局，下法完全一样，比比它们各看了多少局面；MCTS 靠随机模拟估胜率，把模拟次数调到 100 局，它就会犯错。下到一半时点「对比全部算法」，看六种 AI 替你下这一步会怎么选。</p>
+    <div class="console" id="ttt-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 和六种 AI 下井字棋</span><span class="px" id="ttt-turn">YOUR TURN</span></div>
+      <div class="con-tools">
+        <span class="lbl">AI 用</span>
+        <div class="seg" id="ttt-level" role="group" aria-label="AI 用哪种算法">
+          <button type="button" data-l="random" aria-pressed="false">随机</button>
+          <button type="button" data-l="greedy" aria-pressed="false">贪心</button>
+          <button type="button" data-l="depth" aria-pressed="false">深度 2 + 评估</button>
+          <button type="button" data-l="minimax" aria-pressed="false">Minimax</button>
+          <button type="button" data-l="ab" aria-pressed="true">α-β 剪枝</button>
+          <button type="button" data-l="mcts" aria-pressed="false">MCTS</button>
+        </div>
+      </div>
+      <div class="con-tools">
+        <span class="lbl">MCTS 每步模拟</span>
+        <div class="seg" id="ttt-iters" role="group" aria-label="MCTS 每步模拟几局">
+          <button type="button" data-n="100" aria-pressed="false">100 局</button>
+          <button type="button" data-n="1000" aria-pressed="true">1,000 局</button>
+          <button type="button" data-n="10000" aria-pressed="false">10,000 局</button>
+        </div>
+        <label class="sw"><input type="checkbox" id="ttt-view" checked><span>提示：完美对弈的结局</span></label>
+        <span class="gap"></span>
+        <button class="btn sm" id="ttt-first" type="button">让 AI 先手</button>
+        <button class="btn sm pri" id="ttt-new" type="button">再来一局</button>
+      </div>
+      <div class="ttt-grid">
+        <div><div class="board" id="ttt-board" aria-label="井字棋棋盘"></div></div>
+        <div>
+          <div class="scoreboard"><div><small>你（X）</small><b id="ttt-sx">0</b></div><div><small>平局</small><b id="ttt-sd">0</b></div><div><small>AI（O）</small><b id="ttt-so">0</b></div></div>
+          <div class="say ttt-msg"><span class="who">AI</span><p id="ttt-msg">你先下。友情提示：在 Minimax 和 α-β 难度下，平局就是人类的最好成绩。</p></div>
+          <div class="side-h" id="ttt-mind-h">AI 的草稿纸</div>
+          <div class="ttt-mind">
+            <div class="mini" id="ttt-mind" aria-label="AI 上一步给每个格子打的分"></div>
+            <div>
+              <p class="tickinfo" id="ttt-stats" style="margin:0 0 8px">AI 上一步：还没下</p>
+              <p class="ttt-legend">草稿纸上是 AI 上一步给每个空格打的分，带框的是它最后的选择。Minimax 写每步的结局，数字越大赢得越快；α-β 里的「≤」表示这步被剪枝了，只知道它不比已经找到的好；深度 2 写评估函数的估分；MCTS 写胜率和试了几次。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ttt-cmp">
+        <div class="row"><div class="side-h" style="margin:0">六种算法替你（X）想这一步</div><button class="btn sm" id="ttt-cmp" type="button">▶ 对比全部算法</button></div>
+        <div class="tbl-wrap"><table class="cmp" id="ttt-cmp-t"><thead><tr><th>算法</th><th>下在</th><th class="num">计算量</th><th class="num">用时</th><th>这步的结局（之后双方都完美）</th></tr></thead><tbody><tr><td colspan="5" class="muted">下几步之后点「对比全部算法」，空棋盘也可以比。</td></tr></tbody></table></div>
+      </div>
+      <div class="con-foot"><span>棋盘上的「你能赢 / 平局 / 你会输」是完美对弈的结局，和 AI 用哪种算法无关</span><span>用时是在这台电脑上实测的</span></div>
+    </div>
+
+    <div class="duo">
+      <div>
+        <p class="code-cap">实测 ①：α-β 少看了多少局面</p>
+        <div class="tbl"><table>
+          <thead><tr><th>局面</th><th class="num">Minimax</th><th class="num">α-β</th><th class="num">省下</th></tr></thead>
+          <tbody>
+            <tr><td>空棋盘，X 先下</td><td class="num">549,946</td><td class="num">约 21,500</td><td class="num">96%</td></tr>
+            <tr><td>X 下在正中，轮到 O</td><td class="num">55,505</td><td class="num">约 3,100</td><td class="num">94%</td></tr>
+            <tr><td>X 下在角上，轮到 O</td><td class="num">59,705</td><td class="num">约 2,600</td><td class="num">96%</td></tr>
+            <tr><td>X 下在边上，轮到 O</td><td class="num">63,905</td><td class="num">约 3,000</td><td class="num">95%</td></tr>
+          </tbody>
+        </table></div>
+        <p class="tbl-note">单位是搜索过的局面数。α-β 的走法顺序随机打乱，取 200 次的平均；它选出的棋和 Minimax 一样好。</p>
+      </div>
+      <div>
+        <p class="code-cap">实测 ②：对上完美的玩家，各 AI 输了多少</p>
+        <div class="tbl"><table>
+          <thead><tr><th>AI</th><th class="num">输的比例</th></tr></thead>
+          <tbody>
+            <tr><td>随机</td><td class="num">87.0%</td></tr>
+            <tr><td>贪心</td><td class="num">47.5%</td></tr>
+            <tr><td>MCTS · 每步 100 局</td><td class="num">28.7%</td></tr>
+            <tr><td>MCTS · 每步 1,000 局</td><td class="num">2.7%</td></tr>
+            <tr><td>MCTS · 每步 10,000 局</td><td class="num">0（200 盘）</td></tr>
+            <tr><td>深度 2 + 评估</td><td class="num">0（穷举证明）</td></tr>
+            <tr><td>Minimax / α-β</td><td class="num">0（理论保证）</td></tr>
+          </tbody>
+        </table></div>
+        <p class="tbl-note">「完美的玩家」每步都从最优走法里随机挑一个；双方轮流先手，每种 AI 各下 1,000 盘。</p>
+      </div>
+    </div>
+
+    <h3 class="sub">名场面 <small>Case Files</small></h3>
+    <div class="cases four">
+      <article class="case">
+        <div class="case-h"><span class="genre">国际象棋</span><span class="yr">1997</span></div>
+        <h4>深蓝</h4>
+        <p>IBM 的深蓝用 α-β 搜索加专用芯片，每秒评估约 2 亿个局面，击败了国际象棋世界冠军卡斯帕罗夫。</p>
+        <div class="why"><b>算法拆解：</b>暴力搜索 + 剪枝 + 手工评估函数，算力堆到极致。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">围棋</span><span class="yr">2016</span></div>
+        <h4>AlphaGo</h4>
+        <p>蒙特卡洛树搜索加神经网络，4:1 击败李世石。神经网络负责告诉 MCTS 哪些分支值得看、局面大概谁占优。</p>
+        <div class="why"><b>算法拆解：</b>用学习出来的直觉，代替随机模拟和手工评估。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">大战略</span><span class="yr">2013</span></div>
+        <h4>全面战争：罗马 2</h4>
+        <p>战役地图上的 AI 用蒙特卡洛树搜索来做决策，被认为是 MCTS 第一次进入 3A 游戏。为了在有限的时间和内存里算完，开发者对树的规模和分支做了大量裁剪。</p>
+        <div class="why"><b>算法拆解：</b>把棋类算法搬进状态空间巨大的策略游戏，靠领域知识剪枝。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">格斗 / 宝可梦对战</span><span class="yr">人类</span></div>
+        <h4>读招与读换</h4>
+        <p>人类高手的读招、读换，就是在脑子里跑两三层的博弈树：他会换人吗？他知道我知道他会换人吗？</p>
+        <div class="why"><b>算法拆解：</b>人类会故意走次优解来骗你，这是 Minimax 的假设里没有的。</div>
+      </article>
+    </div>
+
+    <div class="pc">
+      <div class="buff"><h4>BUFF <span>优点</span></h4><ul>
+        <li>对抗环境下极强，搜完就是完美解</li>
+        <li>α-β 剪枝效果惊人，结果和完整搜索完全一样</li>
+        <li>MCTS 不需要精确的评估函数，随机模拟就能估计好坏</li>
+      </ul></div>
+      <div class="debuff"><h4>DEBUFF <span>缺点</span></h4><ul>
+        <li>分支一多就爆炸</li>
+        <li>需要能「快进未来」的游戏模型，实时游戏很难做到</li>
+        <li>太强了不好玩，还得专门设计怎么放水</li>
+      </ul></div>
+    </div>
+    <p class="clear"><strong>STAGE CLEAR</strong>博弈树 = 假设对手也很聪明。剪枝、评估函数和随机模拟让它算得动。</p>
+  </div>
+</section>
+
+<!-- ============ 4-1 群聚 ============ -->
+<section class="stage w4" id="boids" aria-labelledby="boids-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">4-1</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">World 4 · 群体与全局</span><span class="type t-flying">飞行</span></p>
+        <h2 class="bn-title" id="boids-h">群聚<span class="en">Boids · Flocking</span></h2>
+        <div class="say"><span class="who">鸟群里的某只鸟</span><p>谁是领头的？不知道。我只看旁边那几只。</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="split">
+      <aside class="dex" aria-label="图鉴：群聚">
+        <div class="dex-top"><span>No.008</span><span>BESTIARY</span></div>
+        <div class="dex-id">
+          <div class="portrait"><span class="spr" data-s="bird"></span></div>
+          <div><div class="dex-name">群聚</div><div class="dex-en">Boids</div><div class="types"><span class="type t-flying">飞行</span></div></div>
+        </div>
+        <dl><dt>分类</dt><dd>群体与全局系</dd><dt>出没地点</dt><dd>游戏里的鸟群、鱼群、虫群，电影《蝙蝠侠归来》的蝙蝠群</dd></dl>
+        <div class="stats">
+          <div class="stat"><span>智商</span><span class="bar" style="--v:2"></span><b>2</b></div>
+          <div class="stat"><span>可控性</span><span class="bar" style="--v:4"></span><b>4</b></div>
+          <div class="stat"><span>上手难度</span><span class="bar" style="--v:3"></span><b>3</b></div>
+          <div class="stat"><span>CPU 开销</span><span class="bar" style="--v:4"></span><b>4</b></div>
+        </div>
+        <p class="flavor">1987 年由 Craig Reynolds 提出。每只鸟只看身边几位邻居，遵守三条规则，整群就像有人指挥一样流动。单只的智商是 2，一群的观赏性是满分。</p>
+        <p class="weak"><b>弱点</b>个体没有目标；参数稍微不对，鸟群就会散架或挤成一团。</p>
+      </aside>
+      <div class="prose">
+        <h3>三条规则，没有队长</h3>
+        <div class="rules">
+          <figure>
+            <svg viewBox="0 0 200 110" aria-hidden="true"><circle cx="100" cy="56" r="34" style="fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:3 3"/><polygon points="88,40 74,44.5 77,40 74,35.5" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><polygon points="130,74 116,78.5 119,74 116,69.5" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><polygon points="38,90 24,94.5 27,90 24,85.5" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><polygon points="178,25 164,29.5 167,25 164,20.5" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><line x1="100" y1="56" x2="116" y2="41" style="stroke:var(--ink);stroke-width:2"/><polygon points="116,41 113.1,48.5 108.4,43.4" style="fill:var(--ink)"/><line x1="100" y1="56" x2="86" y2="72" style="stroke:var(--ink);stroke-width:2"/><polygon points="86,72 88.1,64.3 93.4,68.9" style="fill:var(--ink)"/><polygon points="110.4,56 92.2,61.9 96.1,56 92.2,50.1" style="fill:var(--accent);stroke:var(--border);stroke-width:1.2"/></svg>
+            <figcaption><b>分离</b>别挤。离得太近的邻居，推开。</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="0 0 200 110" aria-hidden="true"><polygon points="60,32 46,36.5 49,32 46,27.5" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><line x1="62" y1="32" x2="76" y2="32" style="stroke:var(--ink-2);stroke-width:1.5"/><polygon points="158,30 144,34.5 147,30 144,25.5" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><line x1="160" y1="30" x2="174" y2="30" style="stroke:var(--ink-2);stroke-width:1.5"/><polygon points="68,84 54,88.5 57,84 54,79.5" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><line x1="70" y1="84" x2="84" y2="84" style="stroke:var(--ink-2);stroke-width:1.5"/><polygon points="154,82 140,86.5 143,82 140,77.5" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><line x1="156" y1="82" x2="170" y2="82" style="stroke:var(--ink-2);stroke-width:1.5"/><polygon points="108,51.3 97.8,67.5 97,60.5 90.3,58.5" style="fill:var(--accent);stroke:var(--border);stroke-width:1.2"/><line x1="108" y1="58" x2="140" y2="58" style="stroke:var(--ink);stroke-width:2;stroke-dasharray:4 3"/><polygon points="140,58 132.8,61.5 132.8,54.5" style="fill:var(--ink)"/></svg>
+            <figcaption><b>对齐</b>跟上。朝邻居的平均方向飞。</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="0 0 200 110" aria-hidden="true"><polygon points="43.7,30.1 29,30.8 33.1,27.2 31.4,22.1" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><polygon points="165.7,24.1 151,24.8 155.1,21.2 153.4,16.1" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><polygon points="173.7,86.1 159,86.8 163.1,83.2 161.4,78.1" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><polygon points="55.7,92.1 41,92.8 45.1,89.2 43.4,84.1" style="fill:var(--ink-2);stroke:var(--border);stroke-width:0"/><line x1="96" y1="56" x2="108" y2="56" style="stroke:var(--ink);stroke-width:2"/><line x1="102" y1="50" x2="102" y2="62" style="stroke:var(--ink);stroke-width:2"/><polygon points="74.2,62.2 57.3,71.1 60.2,64.7 55.3,59.6" style="fill:var(--accent);stroke:var(--border);stroke-width:1.2"/><line x1="74" y1="62" x2="94" y2="58" style="stroke:var(--ink);stroke-width:2"/><polygon points="94,58 87.6,62.8 86.3,56" style="fill:var(--ink)"/></svg>
+            <figcaption><b>聚合</b>别掉队。往邻居的平均位置靠。</figcaption>
+          </figure>
+        </div>
+        <p>没有任何一只鸟知道「鸟群」长什么样，整体的形态是从局部规则里<b>涌现</b>出来的。</p>
+        <div class="formula">a<sub>i</sub> = w<sub>s</sub>·分离 + w<sub>a</sub>·对齐 + w<sub>c</sub>·聚合<small>只看视野半径 r 以内的邻居。分离 = −Σ (p<sub>j</sub> − p<sub>i</sub>) / |p<sub>j</sub> − p<sub>i</sub>|²，离得越近推得越狠；对齐 = 邻居的平均速度方向；聚合 = 邻居的平均位置 − p<sub>i</sub>。每一项都换算成「期望速度 − 当前速度」的转向力，再限制最大力和最大速度，最后按 v ← v + a·Δt、p ← p + v·Δt 更新。</small></div>
+        <p>复杂度：每只鸟都和其他所有鸟比一遍距离，每帧 O(n²)。下面的演示在电脑上有 115 只鸟（手机上 70 只），每帧约 1.3 万次距离计算，还算得动。鸟再多，就把地图切成边长为 r 的格子，每只鸟只查自己和周围 8 个格子里的邻居，平均降到接近 O(n)。</p>
+        <p>Reynolds 后来又整理了一套<b>操控行为</b>（Steering Behaviors）：追逐、逃离、到达时减速、闲逛、预判拦截……2-1 里《吸血鬼幸存者》的怪，就是一大群只会「追逐」的个体。</p>
+      </div>
+    </div>
+
+    <h3 class="sub">实机演示 <small>Try it</small></h3>
+    <p class="sub-lead">拖动三条规则的权重，或者直接点预设。打开「显示一只鸟的视野」，可以看到它到底在看谁。</p>
+    <div class="console" id="bd-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 鸟群模拟器</span><span class="px" id="bd-count">N = 0</span></div>
+      <div class="con-tools">
+        <span class="lbl">预设</span>
+        <div class="seg" id="bd-preset" role="group" aria-label="预设">
+          <button type="button" data-p="flock" aria-pressed="true">鸟群</button>
+          <button type="button" data-p="sand" aria-pressed="false">一盘散沙</button>
+          <button type="button" data-p="blob" aria-pressed="false">抱团取暖</button>
+          <button type="button" data-p="march" aria-pressed="false">齐步走</button>
+        </div>
+        <span class="gap"></span>
+        <label class="sw"><input type="checkbox" id="bd-hawk" checked><span>鼠标是老鹰</span></label>
+        <label class="sw"><input type="checkbox" id="bd-debug" checked><span>显示一只鸟的视野</span></label>
+      </div>
+      <div class="con-body">
+        <div class="con-main"><canvas id="bd-cv" aria-label="鸟群模拟：鼠标移入画面时，鸟会躲开"></canvas></div>
+        <div class="con-side">
+          <div class="side-h">三条规则的权重</div>
+          <div class="sliders">
+            <label class="slider" for="bd-sep"><span>分离 · 别挤 <output id="bd-sep-o">1.6</output></span><input type="range" id="bd-sep" min="0" max="4" step="0.1" value="1.6"></label>
+            <label class="slider" for="bd-ali"><span>对齐 · 跟上 <output id="bd-ali-o">1.0</output></span><input type="range" id="bd-ali" min="0" max="4" step="0.1" value="1.0"></label>
+            <label class="slider" for="bd-coh"><span>聚合 · 别掉队 <output id="bd-coh-o">0.9</output></span><input type="range" id="bd-coh" min="0" max="4" step="0.1" value="0.9"></label>
+            <label class="slider" for="bd-view"><span>视野半径 <output id="bd-view-o">48</output></span><input type="range" id="bd-view" min="15" max="120" step="1" value="48"></label>
+          </div>
+          <p style="font-size:13px;color:var(--ink-2);line-height:1.65;margin:0">高亮的那只鸟：圆圈是它的视野，连线是它这一帧参考的邻居。</p>
+        </div>
+      </div>
+      <div class="con-foot"><span>把鼠标移进画面，鸟群会绕开你</span><span>把「聚合」拉到 0，鸟群会慢慢散开</span></div>
+    </div>
+
+    <h3 class="sub">名场面 <small>Case Files</small></h3>
+    <div class="cases">
+      <article class="case">
+        <div class="case-h"><span class="genre">电影</span><span class="yr">1992</span></div>
+        <h4>蝙蝠侠归来</h4>
+        <p>片中的蝙蝠群和企鹅大军，用的是在 Boids 原始程序基础上修改的群体模拟。这是它最早的大银幕亮相之一。</p>
+        <div class="why"><b>算法拆解：</b>上百个个体，没有一个需要动画师逐帧摆。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">开放世界</span><span class="yr">通用</span></div>
+        <h4>背景里的生态</h4>
+        <p>你走过草地时惊飞的鸟群、潜水时绕着你游的鱼群、洞穴里一大片涌过来的虫群，大多是这类局部规则，再加一点避障。</p>
+        <div class="why"><b>算法拆解：</b>把「玩家」当成一个要逃离的点，加进分离规则就行。演示里的老鹰就是这么做的。</div>
+      </article>
+    </div>
+
+    <div class="pc">
+      <div class="buff"><h4>BUFF <span>优点</span></h4><ul>
+        <li>只用局部信息，个体再多也算得动</li>
+        <li>效果自然，很适合当背景生态</li>
+        <li>规则可以随便加料：避障、躲天敌、跟随领头</li>
+      </ul></div>
+      <div class="debuff"><h4>DEBUFF <span>缺点</span></h4><ul>
+        <li>个体没有目标，也不会思考</li>
+        <li>参数敏感，容易散架或挤成一团</li>
+        <li>想让群体去某个地方，还得配合寻路或流场</li>
+      </ul></div>
+    </div>
+    <p class="clear"><strong>STAGE CLEAR</strong>群聚 = 每个个体只看邻居。整体的「智能」是涌现出来的。</p>
+  </div>
+</section>
+
+<!-- ============ 4-2 AI 导演 ============ -->
+<section class="stage w4" id="director" aria-labelledby="director-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">4-2</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">World 4 · 群体与全局</span><span class="type t-fairy">妖精</span></p>
+        <h2 class="bn-title" id="director-h">AI 导演与动态难度<span class="en">AI Director · Dynamic Difficulty</span></h2>
+        <div class="say"><span class="who">AI 导演</span><p>你以为你在和丧尸战斗。其实我在给你拍电影。</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="split">
+      <aside class="dex" aria-label="图鉴：AI 导演">
+        <div class="dex-top"><span>No.009</span><span>BESTIARY</span></div>
+        <div class="dex-id">
+          <div class="portrait"><span class="spr" data-s="clapper"></span></div>
+          <div><div class="dex-name">AI 导演</div><div class="dex-en">AI Director</div><div class="types"><span class="type t-fairy">妖精</span></div></div>
+        </div>
+        <dl><dt>分类</dt><dd>群体与全局系</dd><dt>出没地点</dt><dd>求生之路、异形：隔离、马力欧赛车、生化危机 4、火焰纹章</dd></dl>
+        <div class="stats">
+          <div class="stat"><span>智商</span><span class="bar" style="--v:7"></span><b>7</b></div>
+          <div class="stat"><span>可控性</span><span class="bar" style="--v:7"></span><b>7</b></div>
+          <div class="stat"><span>上手难度</span><span class="bar" style="--v:6"></span><b>6</b></div>
+          <div class="stat"><span>CPU 开销</span><span class="bar" style="--v:3"></span><b>3</b></div>
+        </div>
+        <p class="flavor">不控制某一个敌人，而是控制整局游戏的节奏。它盯着你有多紧张，决定什么时候放怪、什么时候让你喘口气。属性是妖精，因为它一直在暗中照顾你。</p>
+        <p class="weak"><b>弱点</b>一旦被玩家识破，就会被骂「这游戏针对我」。</p>
+      </aside>
+      <div class="prose">
+        <h3>导演不打你，导演安排谁来打你</h3>
+        <p class="lead">前面所有算法都在回答「这个 NPC 该做什么」。AI 导演回答的是另一个问题：玩家现在需要什么？</p>
+        <p>它手里的工具通常很朴素：控制刷怪的数量和时机，调整道具掉落，给落后的一方一点补偿，在玩家快撑不住时悄悄松一松手。输入是玩家的状态，输出是整局游戏的节奏。</p>
+        <h4>求生之路：四状态的导演</h4>
+        <p>Valve 的 AI 导演会追踪每位幸存者的<b>紧张度</b>：被打、倒地、身边有丧尸被打死，都会让它上涨；没有战斗时，它慢慢回落。导演本身是一个四状态的状态机：积累 → 维持峰值 → 峰值消退 → 放松，然后循环。真实游戏里，峰值维持 3~5 秒，放松阶段有 30~45 秒。</p>
+        <div class="note"><span class="tag">彩蛋</span>是的，World 1 的状态机又回来了。最高层的 AI，用的还是最朴素的算法。</div>
+      </div>
+    </div>
+
+    <h3 class="sub">实机演示 <small>Try it</small></h3>
+    <p class="sub-lead">导演根据紧张度切换阶段、决定刷多少丧尸。用上面的按钮给幸存者「加点压力」，看导演怎么反应。</p>
+    <div class="console" id="dir-demo">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · AI 导演控制台（求生之路式）</span><span class="px" id="dir-phase-lbl">BUILD UP</span></div>
+      <div class="con-tools">
+        <button class="btn sm" id="dir-hit" type="button">被小丧尸挠了一下</button>
+        <button class="btn sm" id="dir-tank" type="button">被 Tank 锤飞</button>
+        <button class="btn sm" id="dir-heal" type="button">打了个包</button>
+        <span class="gap"></span>
+        <button class="btn sm" id="dir-pause" type="button" aria-pressed="false">暂停</button>
+      </div>
+      <div class="dir-grid">
+        <div>
+          <div class="side-h">幸存者紧张度 · 最近 60 秒</div>
+          <div class="chart" id="dir-chart"><svg id="dir-svg" viewBox="0 0 600 250" role="img" aria-label="紧张度随时间变化的折线图，背景色块表示导演所处的阶段"></svg><div class="tip" id="dir-tip" hidden></div></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+            <div class="side-h" style="margin:0">场上丧尸 <span id="dir-zn">0</span></div>
+            <div class="zombies" id="dir-zombies" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div>
+          <div class="side-h">导演的状态机</div>
+          <div class="phase-pills" id="dir-phases">
+            <div class="phase on" data-p="build" style="--pc:var(--w1)"><i></i><span><b>积累 Build Up</b>持续刷怪，直到紧张度冲上峰值</span></div>
+            <div class="phase" data-p="peak" style="--pc:var(--w2)"><i></i><span><b>维持峰值 Sustain Peak</b>高潮再撑几秒</span></div>
+            <div class="phase" data-p="fade" style="--pc:var(--w3)"><i></i><span><b>峰值消退 Peak Fade</b>停止刷怪，让你清场</span></div>
+            <div class="phase" data-p="relax" style="--pc:var(--w4)"><i></i><span><b>放松 Relax</b>给你喘口气，顺便放点补给</span></div>
+          </div>
+          <div class="say" style="margin-top:24px"><span class="who">导演旁白</span><p id="dir-say" class="dir-say">上菜！</p></div>
+        </div>
+      </div>
+      <div class="con-foot"><span>为了演示，时间压缩了大约 5 倍</span><span>把鼠标放在图上可以看每个时刻的数值</span></div>
+    </div>
+
+    <h3 class="sub">名场面 <small>Case Files</small></h3>
+    <div class="cases four">
+      <article class="case">
+        <div class="case-h"><span class="genre">竞速</span><span class="yr">系列</span></div>
+        <h4>马力欧赛车</h4>
+        <p>电脑车手落后时会偷偷加速，领先时会放慢，俗称「橡皮筋」。道具也按名次加权：越靠后越容易抽到强力道具；跑在第一的人，还得提防专打第一名的蓝色龟壳。</p>
+        <div class="why"><b>算法拆解：</b>把差距往回拉，让每个人都觉得自己还有机会。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">动作恐怖</span><span class="yr">2005</span></div>
+        <h4>生化危机 4</h4>
+        <p>游戏里有一个看不见的难度等级，会根据你的表现在后台浮动。打得好，敌人更凶、伤害更高；老是死，敌人就变温柔。很多玩家通关了都不知道它的存在。</p>
+        <div class="why"><b>算法拆解：</b>动态难度调整（DDA）：难度是一个随表现变化的隐藏变量。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">平台跳跃</span><span class="yr">1996</span></div>
+        <h4>古惑狼</h4>
+        <p>同一关死太多次，游戏会悄悄送你一个阿库阿库面具，或者多给你一个存档点。帮你一把，但不告诉你。</p>
+        <div class="why"><b>算法拆解：</b>输入是失败次数，输出是补偿。</div>
+      </article>
+      <article class="case">
+        <div class="case-h"><span class="genre">生存恐怖</span><span class="yr">2014</span></div>
+        <h4>异形：隔离</h4>
+        <p>1-2 里提到的上层导演，用「威胁值」衡量你被逼得有多紧。威胁值高到一定程度，导演就让异形去别处转转，给你一点喘息的空间。</p>
+        <div class="why"><b>算法拆解：</b>导演管节奏，行为树管动作，两层各司其职。</div>
+      </article>
+    </div>
+
+    <h3 class="sub">名场面特写：火焰纹章的「真实命中率」 <small>Tactics RPG · 2002</small></h3>
+    <div class="console" id="fe-demo" style="margin-top:0">
+      <div class="con-bar"><span class="con-title"><i class="rec" aria-hidden="true"></i>实机演示 · 显示命中率 vs 实际命中率</span><span class="px">2 RN</span></div>
+      <div class="fe">
+        <div>
+          <label class="slider" for="fe-hit"><span>屏幕上显示的命中率 <output id="fe-hit-o">70%</output></span><input type="range" id="fe-hit" min="0" max="100" value="70"></label>
+          <div class="hitnums"><div><small>游戏告诉你</small><b id="fe-shown">70%</b></div><div><small>实际命中率</small><b id="fe-true">82.3%</b></div></div>
+          <p style="font-size:15px">从 GBA 上的《封印之剑》开始，多部《火焰纹章》的命中判定会掷两个 0~99 的随机数取平均，平均值小于显示命中率才算命中。两个数取平均，结果更容易落在中间，于是高命中更稳，低命中更难蒙中。</p>
+          <p style="font-size:15px;margin:0">人对概率的直觉本来就是歪的：总觉得 70% 应该「基本必中」，30% 应该「基本不中」。游戏顺着你的直觉，悄悄改了概率。</p>
+        </div>
+        <div>
+          <div class="side-h">显示值 → 实际值</div>
+          <div class="chart" id="fe-chart"><svg id="fe-svg" viewBox="0 0 320 270" role="img" aria-label="显示命中率与实际命中率的关系曲线，以及代表两者相等的对角线"></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pc">
+      <div class="buff"><h4>BUFF <span>优点</span></h4><ul>
+        <li>掌控节奏，让体验张弛有度</li>
+        <li>照顾新手，又不打扰高手</li>
+        <li>成本低，很多时候只是调几个数字</li>
+      </ul></div>
+      <div class="debuff"><h4>DEBUFF <span>缺点</span></h4><ul>
+        <li>被识破会伤害信任感</li>
+        <li>橡皮筋太明显，会让人觉得努力没用</li>
+        <li>难以测试，每个玩家的体验都不一样</li>
+      </ul></div>
+    </div>
+    <p class="clear"><strong>STAGE CLEAR</strong>AI 导演 = 盯着玩家的情绪，调度整局游戏。最好的 AI，是你没发现的那个。</p>
+  </div>
+</section>
+
+<!-- ============ 通关结算 ============ -->
+<section class="stage w0" id="ending" aria-labelledby="ending-h">
+  <header class="banner">
+    <div class="wrap">
+      <div class="bn-num" aria-hidden="true">END</div>
+      <div>
+        <p class="bn-eyebrow"><span class="wtag">All Clear · 通关结算</span></p>
+        <h2 class="bn-title" id="ending-h">通关结算<span class="en">Results</span></h2>
+        <div class="say"><span class="who">村口老爷爷</span><p>九个关卡都打通了？来，清点一下战利品。</p></div>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <h3 class="sub" style="margin-top:52px">图鉴总览 <small>Bestiary</small></h3>
+    <div class="tbl"><table>
+      <thead><tr><th>关卡</th><th>算法</th><th>一句话</th><th>复杂度 / 开销</th><th>代表作</th><th>最适合</th></tr></thead>
+      <tbody>
+        <tr><td class="k">1-1</td><td class="k">有限状态机</td><td>几个格子 + 一堆箭头</td><td>每帧只查当前状态的出边</td><td>吃豆人、合金装备</td><td>行为少、要可预测</td></tr>
+        <tr><td class="k">1-2</td><td class="k">行为树</td><td>按优先级排好的问答树</td><td>每次 Tick 最坏 O(N)</td><td>光环 2、异形：隔离</td><td>行为多、要复用</td></tr>
+        <tr><td class="k">2-1</td><td class="k">贪心</td><td>打分取最大</td><td>O(候选数)</td><td>吃豆人、宝可梦</td><td>便宜、单位多</td></tr>
+        <tr><td class="k">2-2</td><td class="k">麻将何切</td><td>先比向听，再比进张</td><td>每次几百次拆牌搜索</td><td>雀魂、天凤</td><td>规则复杂，但能量化</td></tr>
+        <tr><td class="k">2-3</td><td class="k">效用 AI</td><td>讲究的打分 + 取最大</td><td>O(行动数 × 考虑因素)</td><td>模拟人生、文明</td><td>多种需求权衡</td></tr>
+        <tr><td class="k">3-1</td><td class="k">寻路</td><td>已付代价 + 剩余估计</td><td>O((V + E) log V)</td><td>星际争霸、几乎所有游戏</td><td>从 A 走到 B</td></tr>
+        <tr><td class="k">3-2</td><td class="k">博弈树</td><td>假设对手也聪明</td><td>O(b<sup>d</sup>)，α-β 最好 O(b<sup>d/2</sup>)</td><td>深蓝、AlphaGo</td><td>回合制对抗</td></tr>
+        <tr><td class="k">4-1</td><td class="k">群聚</td><td>只看邻居</td><td>两两比较 O(n²)，分格子约 O(n)</td><td>鸟群、鱼群</td><td>成群的生物</td></tr>
+        <tr><td class="k">4-2</td><td class="k">AI 导演</td><td>调度玩家的情绪</td><td>很便宜，只调几个数</td><td>求生之路</td><td>节奏和难度</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3 class="sub">选型速查 <small>Which brain?</small></h3>
+    <p class="sub-lead">给你的 NPC 挑一个脑子。点右边的答案可以跳回对应关卡。</p>
+    <div class="pick">
+      <a href="#fsm"><span class="q">只有几种行为，要稳定、可预测</span><span class="ar">→</span><span class="ans"><span class="glyph" style="--accent:var(--w1);--on-accent:var(--on-w1)">1-1</span>有限状态机</span></a>
+      <a href="#bt"><span class="q">行为很多，要分优先级、要复用</span><span class="ar">→</span><span class="ans"><span class="glyph" style="--accent:var(--w1);--on-accent:var(--on-w1)">1-2</span>行为树</span></a>
+      <a href="#greedy"><span class="q">候选一大堆，挑当下最好的一个</span><span class="ar">→</span><span class="ans"><span class="glyph" style="--accent:var(--w2);--on-accent:var(--on-w2)">2-1</span>贪心 / 何切式打分</span></a>
+      <a href="#utility"><span class="q">要在好几种需求之间权衡</span><span class="ar">→</span><span class="ans"><span class="glyph" style="--accent:var(--w2);--on-accent:var(--on-w2)">2-3</span>效用 AI</span></a>
+      <a href="#astar"><span class="q">要从 A 走到 B</span><span class="ar">→</span><span class="ans"><span class="glyph" style="--accent:var(--w3);--on-accent:var(--on-w3)">3-1</span>A* + 导航网格</span></a>
+      <a href="#minimax"><span class="q">回合制，对手会还手</span><span class="ar">→</span><span class="ans"><span class="glyph" style="--accent:var(--w3);--on-accent:var(--on-w3)">3-2</span>Minimax / MCTS</span></a>
+      <a href="#boids"><span class="q">一大群，成百上千</span><span class="ar">→</span><span class="ans"><span class="glyph" style="--accent:var(--w4);--on-accent:var(--on-w4)">4-1</span>群聚 / 流场</span></a>
+      <a href="#director"><span class="q">想让玩家「刚好赢」</span><span class="ar">→</span><span class="ans"><span class="glyph" style="--accent:var(--w4);--on-accent:var(--on-w4)">4-2</span>AI 导演 / 动态难度</span></a>
+    </div>
+    <div class="note" style="max-width:76ch"><span class="tag">真相</span>现实中的游戏几乎都是混搭：行为树决定做什么，效用打分挑目标，A* 负责走路，导演在头顶看着这一切。1-1 的守卫演示就是「状态机 + A*」的组合。</div>
+
+    <h3 class="sub">为什么不全用深度学习？ <small>Why not ML?</small></h3>
+    <div class="why4">
+      <div><b>要可控</b>策划要的是「这个 Boss 二阶段更凶，但第三招之后一定有破绽」。行为树能精确写出来，神经网络很难。</div>
+      <div><b>要能调试</b>行为树可以单步跟踪，日志里写着它为什么这么做。神经网络出了错，你只能盯着一堆权重。</div>
+      <div><b>要便宜</b>同屏几百个 NPC，每个每帧只分得到零点几毫秒，还要在玩家的手机上跑。</div>
+      <div><b>要好玩</b>训练出来的 AI 往往太强，或者赢得很怪。游戏 AI 的工作是输得精彩，这一点很难写进奖励函数。</div>
+    </div>
+
+    <h3 class="sub">前沿：机器学习已经进场 <small>Frontier</small></h3>
+    <div class="frontier">
+      <div><span class="yr">2019 · Dota 2</span><b>OpenAI Five</b>击败了 Dota 2 世界冠军战队 OG。</div>
+      <div><span class="yr">2019 · 星际争霸 II</span><b>AlphaStar</b>在天梯上达到宗师段位，论文发表在《自然》。</div>
+      <div><span class="yr">2022 · GT 赛车</span><b>GT Sophy</b>索尼 AI 的赛车手，在游戏里击败顶尖人类车手，后来加入了《GT 赛车 7》。</div>
+      <div><span class="yr">2019 · 日本麻将</span><b>Suphx</b>微软亚洲研究院的麻将 AI，在天凤平台达到十段，是第一个做到的 AI。</div>
+      <div><span class="yr">王者荣耀</span><b>绝悟</b>腾讯 AI Lab 的 MOBA AI，达到职业选手水平，还开放过给玩家挑战。</div>
+      <div><span class="yr">现在</span><b>大语言模型 NPC</b>能和你自由聊天的 NPC 开始出现在商业游戏里。它们最大的难题，恰好是上面第一条：可控。</div>
+    </div>
+
+    <p class="thesis">游戏 AI 的终极目标：用尽量便宜的算法，制造<mark>「它很聪明」</mark>的错觉，然后让你赢。</p>
+
+    <div class="continue" id="continue">
+      <div class="big">CONTINUE? <span class="count" id="cont-n">9</span></div>
+      <p id="cont-msg">感谢聆听。还有问题？投个币。</p>
+      <button class="btn" id="cont-btn" type="button">投币提问 · INSERT COIN</button>
+      <span class="ins">PRESS START TO ASK</span>
+    </div>
+
+    <h3 class="sub">参考资料 <small>Credits</small></h3>
+    <ol class="refs">
+      <li>Jamey Pittman. <a href="https://pacman.holenet.info/" target="_blank" rel="noopener">The Pac-Man Dossier</a>.</li>
+      <li>David Harel. Statecharts: A Visual Formalism for Complex Systems. Science of Computer Programming, 1987.</li>
+      <li>Damian Isla. Handling Complexity in the Halo 2 AI. GDC 2005.</li>
+      <li>Tommy Thompson. <a href="https://www.gamedeveloper.com/design/the-perfect-organism-the-ai-of-alien-isolation" target="_blank" rel="noopener">The Perfect Organism: The AI of Alien: Isolation</a>. Game Developer.</li>
+      <li>Epic Games. 虚幻引擎文档：行为树（Behavior Tree）与观察者中止（Observer Aborts）.</li>
+      <li><a href="https://github.com/pret/pokeemerald" target="_blank" rel="noopener">pret/pokeemerald</a> 反编译项目：src/battle_ai_switch_items.c、src/battle_ai_script_commands.c.</li>
+      <li>Pokémon 官方：<a href="https://www.pokemon.com/us/play-pokemon/worlds/2023/vgc-masters" target="_blank" rel="noopener">2023 世界锦标赛 VGC Masters 队伍表</a>（双打演示的队伍与招式）.</li>
+      <li>Junjie Li 等. <a href="https://arxiv.org/abs/2003.13590" target="_blank" rel="noopener">Suphx: Mastering Mahjong with Deep Reinforcement Learning</a>. arXiv:2003.13590, 2020.</li>
+      <li>Dave Mark, Kevin Dill. Improving AI Decision Modeling Through Utility Theory. GDC 2010.</li>
+      <li>Sid Meier. Sid Meier's Memoir!. 2020；<a href="https://en.wikipedia.org/wiki/Nuclear_Gandhi" target="_blank" rel="noopener">Wikipedia: Nuclear Gandhi</a>.</li>
+      <li>P. E. Hart, N. J. Nilsson, B. Raphael. A Formal Basis for the Heuristic Determination of Minimum Cost Paths. 1968.</li>
+      <li>Elijah Emerson. Crowd Pathfinding and Steering Using Flow Field Tiles. Game AI Pro, 2013.</li>
+      <li>Mikko Mononen. <a href="https://github.com/recastnavigation/recastnavigation" target="_blank" rel="noopener">Recast &amp; Detour</a>.</li>
+      <li>D. E. Knuth, R. W. Moore. An Analysis of Alpha-Beta Pruning. Artificial Intelligence, 1975.</li>
+      <li>L. Kocsis, C. Szepesvári. Bandit Based Monte-Carlo Planning. ECML 2006.</li>
+      <li>M. Campbell, A. J. Hoane, F. Hsu. Deep Blue. Artificial Intelligence, 2002.</li>
+      <li>Alex J. Champandard. Monte-Carlo Tree Search in TOTAL WAR: ROME II's Campaign AI. AiGameDev, 2014.</li>
+      <li>Stuart Russell, Peter Norvig.《人工智能：一种现代方法》：对抗搜索一章及井字棋评估函数习题.</li>
+      <li>Craig Reynolds. <a href="https://www.red3d.com/cwr/boids/" target="_blank" rel="noopener">Flocks, Herds, and Schools: A Distributed Behavioral Model</a>. SIGGRAPH 1987.</li>
+      <li>Michael Booth. The AI Systems of Left 4 Dead. AIIDE 2009 主题演讲.</li>
+      <li><a href="https://minecraft.wiki/w/Creeper" target="_blank" rel="noopener">Minecraft Wiki: Creeper</a>.</li>
+      <li>Ian Millington. AI for Games, 3rd ed. CRC Press, 2019.</li>
+      <li>图片：《怪物猎人：世界》《雀魂》截图来自各自 Steam 商店页的官方截图；宝可梦立绘来自 <a href="https://github.com/PokeAPI/sprites" target="_blank" rel="noopener">PokeAPI/sprites</a>（© Nintendo / Creatures / GAME FREAK）。仅用于课堂介绍。</li>
+      <li>字体：站酷庆科黄油体、Pixelify Sans、JetBrains Mono，均为 SIL Open Font License，许可文件在 assets/fonts 里。</li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>NPC 脑内图鉴 · 算法课结课汇报</span>
+    <span>文中游戏名称与资料仅用于课堂介绍 · <span class="kbd">←</span> <span class="kbd">→</span> 切换关卡</span>
+  </div>
+</footer>
+
+<script src="assets/js/core.js"></script>
+<script src="assets/js/hero.js"></script>
+<script src="assets/js/fsm.js"></script>
+<script src="assets/js/bt.js"></script>
+<script src="assets/js/ghosts.js"></script>
+<script src="assets/js/doubles.js"></script>
+<script src="assets/js/mahjong.js"></script>
+<script src="assets/js/utility.js"></script>
+<script src="assets/js/astar.js"></script>
+<script src="assets/js/ttt.js"></script>
+<script src="assets/js/boids.js"></script>
+<script src="assets/js/director.js"></script>
+
+</body>
+</html>

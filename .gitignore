@@ -1,0 +1,16 @@
+# 旧版本（v1 原件、v3 幻灯片版）和没用上的素材，只留在本地
+archive/
+
+# 系统、编辑器自动生成的文件
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+
+# 本地调试可能产生的东西
+node_modules/
+__pycache__/
+*.log
